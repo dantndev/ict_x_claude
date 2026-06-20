@@ -1,0 +1,31 @@
+# NQ (E-mini Nasdaq-100) — instrument specs and overrides.
+# CME futures, electronic, ticker family ENQ; June 2026 contract: ENQM26.
+
+symbol:
+  family: NQ
+  contract: ENQM26
+  exchange: CME
+  description: "E-mini Nasdaq-100 Futures, June 2026"
+
+instrument:
+  tick_size: 0.25            # points
+  tick_value_usd: 5.00       # $5 per tick (= $20 per point) on the E-mini NQ
+  point_value_usd: 20.00
+  currency: USD
+  trading_hours_ny:          # CME E-mini globex (Sun 18:00 - Fri 17:00 NY, with 17:00-18:00 daily break)
+    open: "18:00"
+    close: "17:00"
+    daily_break: ["17:00", "18:00"]
+
+commissions:
+  per_side_usd: 1.25         # placeholder, adjust to your broker
+  slippage_ticks: 1
+
+risk_overrides:
+  # Tighter for NQ-specific volatility profile if needed
+  per_trade_risk_pct: 0.5
+  max_trades_per_day: 6
+
+structure_overrides:
+  displacement:
+    body_atr_min: 1.8        # NQ is fast; require a stronger move to count

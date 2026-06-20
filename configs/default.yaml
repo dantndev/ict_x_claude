@@ -1,0 +1,83 @@
+# Default configuration shared by all symbols.
+# Per-symbol overrides live in configs/<symbol>.yaml and override these values.
+
+runtime:
+  timezone: America/New_York
+  log_level: INFO
+
+data:
+  http:
+    backtest_url: http://localhost:8080/backtest/
+    request_timeout_s: 30
+  l2:
+    csv_dir: C:/claude_algo_4/analisis_ml_v1/Data_Historica_L2_V2
+    file_pattern: "l2_v2_*.csv"
+  cache:
+    parquet_dir: data/cache
+    enabled: true
+
+timeframes:
+  primary: "1m"
+  resampled: ["3m", "5m", "15m", "1H", "4H", "1D"]
+  htf_bias: ["1H", "4H", "1D"]
+
+sessions:
+  # Times in America/New_York
+  midnight_open: "00:00"
+  asia:           { start: "20:00", end: "00:00", trade: false }
+  london_kz:      { start: "02:00", end: "05:00", trade: true  }
+  ny_am_kz:       { start: "07:00", end: "10:00", trade: true  }
+  ny_open:        { start: "08:30", end: "08:35", trade: false }  # news block
+  ny_lunch:       { start: "12:00", end: "13:00", trade: false }
+  ny_pm_kz:       { start: "13:30", end: "16:00", trade: true  }
+  force_flat_at:  "16:30"
+  silver_bullet_am: { start: "10:00", end: "11:00" }
+  silver_bullet_pm: { start: "14:00", end: "15:00" }
+
+structure:
+  swing_lookback: 3        # 3-bar fractal (will generalize to N in Phase 1)
+  displacement:
+    atr_lookback: 14
+    body_atr_min: 1.5      # body must be >= 1.5 * ATR to count as displacement
+    body_range_min: 0.6    # body / candle_range >= 0.6
+
+imbalance:
+  fvg:
+    require_displacement: true
+    invalidation: body_close_beyond_ce   # CE = consequent encroachment
+  bpr:
+    require_overlap: true
+
+blocks:
+  order_block:
+    require_displacement: true
+    invalidation: body_close_beyond_mt   # MT = mean threshold
+  breaker:
+    require_prior_sweep: true
+  mitigation:
+    require_prior_sweep: false
+  rejection:
+    require_prior_sweep: true
+
+ranges:
+  ote:
+    levels: [0.618, 0.705, 0.79]
+    sweet_spot: 0.705
+
+liquidity:
+  equal_levels:
+    tolerance_ticks: 2
+  sweep:
+    wick_only: true        # body close beyond = invalidation, not sweep
+
+risk:
+  per_trade_risk_pct: 0.5  # of account
+  daily_loss_limit_pct: 2.0
+  max_consecutive_losses: 4
+  max_trades_per_day: 6
+  midnight_open_filter: true
+
+backtest:
+  starting_equity: 100000.0
+  fill_model: next_bar_open
+  slippage_ticks: 1

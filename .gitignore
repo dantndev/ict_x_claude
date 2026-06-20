@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment / secrets
+.env
+.env.local
+*.key
+*.pem
+credentials.json
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/
+
+# Project-specific generated content (keep folders via .gitkeep)
+data/*
+!data/.gitkeep
+reports/*
+!reports/.gitkeep
+logs/*
+!logs/.gitkeep
+checkpoints/*
+!checkpoints/.gitkeep
+
+# Local parquet cache and large files
+*.parquet
+*.feather
+*.h5
+
+# Jupyter
+.ipynb_checkpoints/
