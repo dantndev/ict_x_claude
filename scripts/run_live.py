@@ -40,6 +40,7 @@ from ict_bot.data.models import Bars
 from ict_bot.execution.kill_switch import KillSwitch
 from ict_bot.execution.quantower import QuantowerBroker
 from ict_bot.execution.runner import LiveConfig, LiveRunner
+from ict_bot.notifications import TelegramCommander, TelegramNotifier
 from ict_bot.risk.limits import LimitsConfig
 from ict_bot.risk.sizing import InstrumentSpec, RiskConfig
 from ict_bot.utils.logging import configure_logging, get_logger
@@ -178,6 +179,18 @@ def main(argv: list[str] | None = None) -> int:
         kill_switch=kill,
     )
 
+    # Telegram: notifier (fire-and-forget) + commander (long-poll listener).
+    notifier = TelegramNotifier()
+    commander = TelegramCommander(
+        token=notifier.token, chat_id=notifier.chat_id,
+        enabled=notifier.activo, poll_timeout=20,
+    )
+    commander.start()
+    notifier.enviar(
+        "sistema_inicio",
+        f"ict_x_claude live ({acct['exec_symbol']}) — dry_run={is_dry}",
+    )
+
     aggregator = _BarAggregator(
         symbol=acct["exec_symbol"],
         window_minutes=int(conn["bar_window_minutes"]),
@@ -186,12 +199,51 @@ def main(argv: list[str] | None = None) -> int:
 
     def _graceful(_sig, _frame) -> None:
         log.warning("signal_received_flatten")
+        notifier.enviar("sistema_parada", "SIGINT received — flatten + disconnect")
         kill.trip("manual_signal")
         broker.flatten_all()
+        commander.stop()
         broker.disconnect()
         sys.exit(0)
 
     os_signal.signal(os_signal.SIGINT, _graceful)
+
+    def _handle_commands() -> bool:
+        """Drain queue, mutate runner state, send notifier feedback.
+        Returns True if the loop should exit (after /stop or /restart)."""
+        for cmd in commander.poll_commands():
+            if cmd in {"status", "start", "help"}:
+                pos = broker.positions()
+                status_msg = (
+                    f"paused={runner.paused} kill={kill.tripped} "
+                    f"open_positions={len(pos)} equity_est={broker.equity_usd():.2f}"
+                )
+                notifier.enviar("comando_ok", f"/status → {status_msg}")
+                continue
+            if cmd == "pause":
+                runner.paused = True
+                notifier.enviar("pause", "/pause → no new entries")
+                continue
+            if cmd == "resume":
+                runner.paused = False
+                notifier.enviar("resume", "/resume → entries re-enabled")
+                continue
+            if cmd == "flatten":
+                broker.flatten_all()
+                notifier.enviar("flatten", "/flatten → all positions closed")
+                continue
+            if cmd == "stop":
+                notifier.enviar("sistema_parada", "/stop → clean shutdown")
+                runner.stop_requested = True
+                return True
+            if cmd == "restart":
+                # exit code 42 is the conventional supervisor restart signal
+                notifier.enviar("sistema_parada", "/restart → exit 42")
+                broker.flatten_all()
+                commander.stop()
+                broker.disconnect()
+                sys.exit(42)
+        return False
 
     log.info("live_loop_started", dry_run=is_dry, exec_symbol=acct["exec_symbol"])
     started_at = time.time()
@@ -200,6 +252,9 @@ def main(argv: list[str] | None = None) -> int:
         while True:
             if args.max_runtime_sec and (time.time() - started_at) > args.max_runtime_sec:
                 log.info("max_runtime_reached")
+                break
+
+            if _handle_commands() or runner.stop_requested:
                 break
 
             snap = broker.latest_snapshot()
@@ -212,23 +267,24 @@ def main(argv: list[str] | None = None) -> int:
             if bars is not None:
                 runner.on_bars_window(bars)
 
-            # Heartbeat every 60 s
+            # Heartbeat every 60 s (log + Telegram if active)
             now = time.time()
             if now - last_kz_log >= 60:
                 pos = broker.positions()
                 log.info("heartbeat", ts_ny=str(ts_ny),
                          price=snap.precio, bars=len(aggregator._closed_rows),
                          open_positions=len(pos),
-                         kill_tripped=kill.tripped)
+                         paused=runner.paused, kill_tripped=kill.tripped)
                 last_kz_log = now
-
-            time.sleep(poll_period)
     except Exception as e:
         log.error("loop_crashed", error=f"{type(e).__name__}: {e}")
         kill.trip("loop_crash")
+        notifier.enviar("error", f"loop crashed: {type(e).__name__}: {e}")
         broker.flatten_all()
     finally:
+        commander.stop()
         broker.disconnect()
+        notifier.enviar("sistema_parada", "loop stopped, disconnect ok")
         log.info("live_loop_stopped")
     return 0
 

@@ -36,7 +36,8 @@ def _parse_date(s: str) -> date:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Walk-forward + Monte Carlo")
-    p.add_argument("--csv", default="C:/claude_algo_4/cme_nq_2021_2026/datos_cme.csv")
+    p.add_argument("--csv",
+                   default=str(REPO_ROOT / "data" / "cme_nq_2021_2026" / "datos_cme.csv"))
     p.add_argument("--family", default="MNQ", choices=["MNQ", "NQ"])
     p.add_argument("--tf", default="5m",
                    choices=["1m", "3m", "5m", "15m", "1H", "4H", "1D"])

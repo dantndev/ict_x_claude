@@ -62,6 +62,8 @@ class LiveRunner:
     seen_bar_signal_indices: set[int] = field(default_factory=set)
     last_mid_open: float | None = None
     last_mid_open_day: date | None = None
+    paused: bool = False           # remote /pause toggle
+    stop_requested: bool = False   # remote /stop toggle
 
     def on_bars_window(self, bars_window: Bars) -> None:  # noqa: PLR0912
         """Re-run detectors over the trailing window and act on the latest signals."""
@@ -84,6 +86,8 @@ class LiveRunner:
             return
 
         # Gates that block new orders
+        if self.paused:
+            return
         if self.config.enforce_killzones and \
                 not new_entries_allowed(last_ts, self.sessions_config):
             return

@@ -10,8 +10,11 @@ data:
     backtest_url: http://localhost:8080/backtest/
     request_timeout_s: 30
   l2:
-    csv_dir: C:/claude_algo_4/analisis_ml_v1/Data_Historica_L2_V2
+    csv_dir: data/Data_Historica_L2_V2     # local copy under project root
     file_pattern: "l2_v2_*.csv"
+  cme:
+    csv_path: data/cme_nq_2021_2026/datos_cme.csv
+    families: ["MNQ", "NQ"]
   cache:
     parquet_dir: data/cache
     enabled: true

@@ -39,11 +39,11 @@ class Settings(BaseSettings):
     )
 
     ict_l2_csv_dir: Path = Field(
-        default=Path("C:/claude_algo_4/analisis_ml_v1/Data_Historica_L2_V2"),
+        default=REPO_ROOT / "data" / "Data_Historica_L2_V2",
     )
     ict_backtest_api_url: str = Field(default="http://localhost:8080/backtest/")
-    ict_symbol: str = Field(default="ENQM26")
-    ict_continuous_symbol: str = Field(default="NQ")
+    ict_symbol: str = Field(default="ENQU26")
+    ict_continuous_symbol: str = Field(default="MNQ")
     ict_timezone: str = Field(default="America/New_York")
     ict_log_level: str = Field(default="INFO")
 

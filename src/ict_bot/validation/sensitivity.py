@@ -9,6 +9,9 @@ from ict_bot.backtest.runner import PipelineConfig, run_pipeline
 from ict_bot.data.models import Bars
 from ict_bot.reporting.metrics import Metrics, compute_metrics
 from ict_bot.signals.imbalance.fvg import FVGConfig
+from ict_bot.signals.setups.mss_fvg import MssFvgConfig
+from ict_bot.signals.setups.ob_ote import ObOteConfig
+from ict_bot.signals.setups.silver_bullet import SilverBulletConfig
 from ict_bot.signals.setups.unicorn import UnicornConfig
 from ict_bot.structure.displacement import DisplacementConfig
 
@@ -66,6 +69,9 @@ def sweep_displacement(
                     fvg=FVGConfig(require_displacement=True, min_gap_ticks=1,
                                   tick_size=0.25),
                     unicorn=UnicornConfig(min_rr=rr),
+                    mss_fvg=MssFvgConfig(min_rr=rr),
+                    ob_ote=ObOteConfig(min_rr=rr),
+                    silver_bullet=SilverBulletConfig(min_rr=rr),
                 )
                 res = run_pipeline(bars, pipeline_config=pcfg, backtest_config=bcfg)
                 metrics = compute_metrics(res.portfolio)
