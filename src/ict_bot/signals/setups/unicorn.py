@@ -24,6 +24,8 @@ class UnicornConfig:
     min_rr: float = 1.5
     fallback_tp_r: float = 3.0
     same_leg_window_factor: float = 1.5     # window = leg.length * factor
+    tp_strategy: str = "nearest_pool"       # "nearest_pool" | "fixed_R"
+    fixed_tp_r: float = 2.0
 
 
 def _proximal_edge(intersection_low: float, intersection_high: float,
@@ -95,17 +97,21 @@ def detect_unicorns(
             sl_anchor = _fvg_anchor_extreme(bars, g, b.direction)
             offset = cfg.sl_offset_ticks * cfg.tick_size
             sl = sl_anchor - offset if b.direction == Direction.BULL else sl_anchor + offset
-            # TP target
-            tp_pool = _nearest_opposite_pool(pools, entry, b.direction)
             risk = abs(entry - sl)
             if risk <= 0:
                 continue
-            if tp_pool is not None:
-                tp = tp_pool.price
-            else:
-                tp = (entry + cfg.fallback_tp_r * risk
+            if cfg.tp_strategy == "fixed_R":
+                tp = (entry + cfg.fixed_tp_r * risk
                       if b.direction == Direction.BULL
-                      else entry - cfg.fallback_tp_r * risk)
+                      else entry - cfg.fixed_tp_r * risk)
+            else:
+                tp_pool = _nearest_opposite_pool(pools, entry, b.direction)
+                if tp_pool is not None:
+                    tp = tp_pool.price
+                else:
+                    tp = (entry + cfg.fallback_tp_r * risk
+                          if b.direction == Direction.BULL
+                          else entry - cfg.fallback_tp_r * risk)
             reward = abs(tp - entry)
             if reward / risk < cfg.min_rr:
                 continue

@@ -30,6 +30,8 @@ class SilverBulletConfig:
     min_rr: float = 1.5
     fallback_tp_r: float = 3.0
     min_tp_distance_in_risks: float = 1.0
+    tp_strategy: str = "nearest_pool"    # "nearest_pool" | "fixed_R"
+    fixed_tp_r: float = 2.0
 
 
 def detect_silver_bullet(
@@ -62,26 +64,33 @@ def detect_silver_bullet(
         risk = abs(entry - sl)
         if risk <= 0:
             continue
-        min_tp_dist = cfg.min_tp_distance_in_risks * risk
-        if g.direction == Direction.BULL:
-            tp_pool = min(
-                (p for p in pools if p.side == Side.BSL and (p.price - entry) >= min_tp_dist),
-                key=lambda p: p.price - entry,
-                default=None,
-            )
-        else:
-            tp_pool = min(
-                (p for p in pools if p.side == Side.SSL and (entry - p.price) >= min_tp_dist),
-                key=lambda p: entry - p.price,
-                default=None,
-            )
-        tp = (
-            tp_pool.price
-            if tp_pool is not None
-            else (entry + cfg.fallback_tp_r * risk
+        if cfg.tp_strategy == "fixed_R":
+            tp = (entry + cfg.fixed_tp_r * risk
                   if g.direction == Direction.BULL
-                  else entry - cfg.fallback_tp_r * risk)
-        )
+                  else entry - cfg.fixed_tp_r * risk)
+        else:
+            min_tp_dist = cfg.min_tp_distance_in_risks * risk
+            if g.direction == Direction.BULL:
+                tp_pool = min(
+                    (p for p in pools if p.side == Side.BSL
+                     and (p.price - entry) >= min_tp_dist),
+                    key=lambda p: p.price - entry,
+                    default=None,
+                )
+            else:
+                tp_pool = min(
+                    (p for p in pools if p.side == Side.SSL
+                     and (entry - p.price) >= min_tp_dist),
+                    key=lambda p: entry - p.price,
+                    default=None,
+                )
+            tp = (
+                tp_pool.price
+                if tp_pool is not None
+                else (entry + cfg.fallback_tp_r * risk
+                      if g.direction == Direction.BULL
+                      else entry - cfg.fallback_tp_r * risk)
+            )
         if abs(tp - entry) / risk < cfg.min_rr:
             continue
         out.append(

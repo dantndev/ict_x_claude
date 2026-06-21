@@ -30,6 +30,8 @@ class ObOteConfig:
     fallback_tp_r: float = 3.0
     require_inside_ote: bool = False     # OTE is a CONFLUENCE boost, not a gate
     min_tp_distance_in_risks: float = 1.0  # tp_pool must be >= 1R away to count
+    tp_strategy: str = "nearest_pool"    # "nearest_pool" | "fixed_R"
+    fixed_tp_r: float = 2.0              # used only when tp_strategy == "fixed_R"
 
 
 def _first_retest_index(bars: Bars, ob: OrderBlock) -> int | None:
@@ -72,26 +74,33 @@ def detect_ob_ote(
         risk = abs(entry - sl)
         if risk <= 0:
             continue
-        min_tp_dist = cfg.min_tp_distance_in_risks * risk
-        if ob.direction == Direction.BULL:
-            tp_pool = min(
-                (p for p in pools if p.side == Side.BSL and (p.price - entry) >= min_tp_dist),
-                key=lambda p: p.price - entry,
-                default=None,
-            )
-        else:
-            tp_pool = min(
-                (p for p in pools if p.side == Side.SSL and (entry - p.price) >= min_tp_dist),
-                key=lambda p: entry - p.price,
-                default=None,
-            )
-        tp = (
-            tp_pool.price
-            if tp_pool is not None
-            else (entry + cfg.fallback_tp_r * risk
+        if cfg.tp_strategy == "fixed_R":
+            tp = (entry + cfg.fixed_tp_r * risk
                   if ob.direction == Direction.BULL
-                  else entry - cfg.fallback_tp_r * risk)
-        )
+                  else entry - cfg.fixed_tp_r * risk)
+        else:
+            min_tp_dist = cfg.min_tp_distance_in_risks * risk
+            if ob.direction == Direction.BULL:
+                tp_pool = min(
+                    (p for p in pools if p.side == Side.BSL
+                     and (p.price - entry) >= min_tp_dist),
+                    key=lambda p: p.price - entry,
+                    default=None,
+                )
+            else:
+                tp_pool = min(
+                    (p for p in pools if p.side == Side.SSL
+                     and (entry - p.price) >= min_tp_dist),
+                    key=lambda p: entry - p.price,
+                    default=None,
+                )
+            tp = (
+                tp_pool.price
+                if tp_pool is not None
+                else (entry + cfg.fallback_tp_r * risk
+                      if ob.direction == Direction.BULL
+                      else entry - cfg.fallback_tp_r * risk)
+            )
         if abs(tp - entry) / risk < cfg.min_rr:
             continue
         out.append(

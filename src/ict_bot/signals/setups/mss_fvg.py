@@ -23,9 +23,11 @@ class MssFvgConfig:
     fallback_tp_r: float = 3.0
     fvg_lookback_bars: int = 8
     min_tp_distance_in_risks: float = 1.0
+    tp_strategy: str = "nearest_pool"    # "nearest_pool" | "fixed_R"
+    fixed_tp_r: float = 2.0
 
 
-def detect_mss_fvg(
+def detect_mss_fvg(  # noqa: PLR0912
     bars: Bars,
     mss_events: list[StructureEvent],
     fvgs: list[FVG],
@@ -63,20 +65,29 @@ def detect_mss_fvg(
         risk = abs(entry - sl)
         if risk <= 0:
             continue
-        min_tp_dist = cfg.min_tp_distance_in_risks * risk
-        if ev.direction == Direction.BULL:
-            tp_pool = min(
-                (p for p in pools if p.side == Side.BSL and (p.price - entry) >= min_tp_dist),
-                key=lambda p: p.price - entry,
-                default=None,
-            )
+        if cfg.tp_strategy == "fixed_R":
+            tp_pool = None
         else:
-            tp_pool = min(
-                (p for p in pools if p.side == Side.SSL and (entry - p.price) >= min_tp_dist),
-                key=lambda p: entry - p.price,
-                default=None,
-            )
-        if tp_pool is not None:
+            min_tp_dist = cfg.min_tp_distance_in_risks * risk
+            if ev.direction == Direction.BULL:
+                tp_pool = min(
+                    (p for p in pools if p.side == Side.BSL
+                     and (p.price - entry) >= min_tp_dist),
+                    key=lambda p: p.price - entry,
+                    default=None,
+                )
+            else:
+                tp_pool = min(
+                    (p for p in pools if p.side == Side.SSL
+                     and (entry - p.price) >= min_tp_dist),
+                    key=lambda p: entry - p.price,
+                    default=None,
+                )
+        if cfg.tp_strategy == "fixed_R":
+            tp = (entry + cfg.fixed_tp_r * risk
+                  if ev.direction == Direction.BULL
+                  else entry - cfg.fixed_tp_r * risk)
+        elif tp_pool is not None:
             tp = tp_pool.price
         else:
             tp = (entry + cfg.fallback_tp_r * risk
