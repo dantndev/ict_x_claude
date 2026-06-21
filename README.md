@@ -40,10 +40,12 @@ Verification:
 
 ## Currently deployed parameters
 
-Based on the pilots 001-005 (`docs/pilots/`), the production config trades
+Based on the pilots 001-006 (`docs/pilots/`), the production config trades
 exclusively in the two **Silver Bullet** windows — the ICT-canonical
 "macros" where the bot captures **87% of historical PnL** with **35% of the
-trades** vs the all-killzone baseline.
+trades** vs the all-killzone baseline. Pilot 006 confirmed that **1-minute
+bars** beat the 5m/15m alternatives on `trades/day × expectancy_R`, at the
+cost of a slightly worse OOS R (+0.55 vs +0.88 for 5m).
 
 ```yaml
 # configs/lucid_propfirm.yaml
@@ -54,6 +56,7 @@ account:
   exec_symbol: MNQU26
 
 setups:
+  tf: 1m                          # pilot 006 winner — 5x more trades/day
   body_atr_min: 1.0
   body_range_min: 0.5
   tp_strategy: fixed_R
@@ -65,19 +68,20 @@ execution:
     - silver_bullet_pm            # 14:00-15:00 NY
 
 risk:
-  max_consecutive_losses: 10      # user-set noisy-day stop
-  max_trades_per_day: 5
+  max_consecutive_losses: 6       # pre-empts pilot 006's worst streak of 7
+  max_trades_per_day: 8           # 1m mode does ~1.83/day; 8 is safety cap
   daily_loss_limit_pct: 1.0       # $250 hard daily cap
 ```
 
-Backtest expectation with this config (2024-01 → 2026-03, IS-biased,
-treat as direction not magnitude):
+Backtest expectation with this config on 1m bars (2024-01 → 2026-03,
+IS-biased, treat as direction not magnitude):
 
-- 283 trades, **68% win rate**, +1.41 R/trade
-- MaxDD 0.44% ($8.7k on a $2M-equiv account; scaled to your $25k it's
-  ~$110 worst observed drawdown)
-- Bootstrap p95 DD 4.52%; 100% probability of profit across 1000
-  shuffled trade orderings
+- 1490 trades, **60% win rate**, +1.17 R/trade
+- ~1.83 trades/day (≈ 5/week)
+- MaxDD 0.30%, bootstrap p95 DD 5.92%
+- WF 8/8 folds OOS positive, aggregate +0.55R
+- Realistic live projection with 2 micros: **~$38/day net**, reaching the
+  $1,250 evaluation target in **~6-7 weeks**
 
 ## Shadow signal logger (analyze mode A/C while running mode B)
 
@@ -335,6 +339,7 @@ Each pilot is independent and re-runnable. Full reports in `docs/pilots/`.
 | 003 | Walk-forward of 3 fixed-R candidates | Winner = `(1.0, 0.5, fixed_tp_r=1.5)`. 8/8 folds positive, +0.86R OOS. Bug fix shipped (`LimitsState.reset_for_day` was leaking streak lock across days). | `docs/pilots/003_wf_candidates.md` |
 | 004 | Per-killzone PnL breakdown (winner cell) | **87% of all PnL** concentrated in Silver Bullet AM + PM. NY PM "net" has negative expectancy. London adds 2% of PnL with 22% of trades. | `docs/pilots/004_session_breakdown.md` |
 | 005 | Session-mode comparison (A vs B vs C) | **Mode B (Silver Bullet only) wins every risk metric**: MaxDD halved, p95 DD ~1/3, worst trade -40%, max consec losers 3 vs 6. Promoted to production. | `docs/pilots/005_session_mode_comparison.md` |
+| 006 | TF sweep on mode B (1m/3m/5m/15m) | **1m wins on tr/day × exp_R = 2.149** (4.4× the 5m baseline). Slight OOS R degradation (+0.55 vs +0.88) is the trade-off. Caught a latent live↔backtest mismatch (live always ran 1m; backtest defaulted to 5m). Promoted 1m to production. | `docs/pilots/006_tf_sweep.md` |
 
 Scripts: `scripts/pilot_sensitivity_sweep.py`, `scripts/pilot_fixed_tp.py`,
 `scripts/pilot_003_wf_candidates.py`, `scripts/pilot_004_session_breakdown.py`,

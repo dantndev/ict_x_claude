@@ -29,20 +29,26 @@ risk:
   max_quantity: 2                     # never more than 2 micros at once
   min_quantity: 1
   daily_loss_limit_pct: 1.0           # $250 → matches account.daily_loss_limit_usd
-  # Operating only in SB AM + SB PM means the consecutive-losses streak
-  # is the LEAST likely killswitch to trip (worst observed = 3 in 2 yrs).
-  # User-chosen cap = 10: effectively a noisy-day stop. The daily-loss
-  # cap ($250) and per-trade risk ($60) remain the hard protectors.
-  max_consecutive_losses: 10
-  max_trades_per_day: 5               # cap frequency in bad sessions
+  # 1m mode (pilot 005b): worst consecutive streak observed = 7 over 2 yr.
+  # Cap at 6 so the streak hits the kill switch BEFORE materializing the
+  # full worst-case ($210 lost vs $700 of real margin after the $300 already
+  # spent on the previous bot). User decision: accept the early-stop risk
+  # in exchange for the 5x faster route to the $1,250 evaluation target.
+  max_consecutive_losses: 6
+  max_trades_per_day: 8               # 1m mode runs ~1.8 trades/day; 8 is a noisy-day stop
 
 setups:
   enabled: [unicorn, mss_fvg, ob_ote, silver_bullet]
-  # Calibration from docs/pilots/003_wf_candidates.md (winner: A_max_freq).
-  # WF 2024-01 -> 2026-03: 8/8 folds positive, aggregate OOS +0.86R, +$401k.
-  # Same expected edge as the pilot-001 nearest_pool baseline (+0.85R) but
-  # with a deterministic TP that does not depend on pool registry density,
-  # so it should be more stable in live.
+  # Calibration: pilots 001 -> 005b in docs/pilots/.
+  # The live runner builds 1-minute bars from the DOM2 mid feed and feeds
+  # them straight to the detectors (no resampling), so the validated
+  # backtest cell is the pilot-005b 1m mode B row:
+  #   1.83 trades/day, WR 60%, expectancy +1.17R, WF 8/8 OOS positive,
+  #   p95 max DD 5.92%, worst consecutive losers 7 in 2 years.
+  # User decision (urgency over selectivity): faster path to the $1,250
+  # evaluation target. Slower 5m mode (WF +0.88R) is the conservative
+  # fallback if 1m degrades in live — switching back is a TF parameter.
+  tf: 1m
   body_atr_min: 1.0
   body_range_min: 0.5
   min_rr: 1.0                          # redundant when tp_strategy=fixed_R
