@@ -18,6 +18,12 @@ class SessionsConfig:
     force_flat_at: time = time(16, 30)
     silver_bullet_am: tuple[time, time] = (time(10, 0), time(11, 0))
     silver_bullet_pm: tuple[time, time] = (time(14, 0), time(15, 0))
+    # Mode-based filter. When set, new_entries_allowed only fires inside the
+    # listed windows. Valid tags:
+    #   "london_kz", "ny_am_kz", "ny_pm_kz",
+    #   "silver_bullet_am", "silver_bullet_pm"
+    # None = all killzones + silver-bullet windows are allowed (default).
+    allowed_windows: tuple[str, ...] | None = None
 
 
 def _in(t: time, window: tuple[time, time], *, inclusive_end: bool = True) -> bool:
@@ -63,12 +69,32 @@ def silver_bullet_pm(dt: datetime, cfg: SessionsConfig | None = None) -> bool:
 
 
 def new_entries_allowed(dt: datetime, cfg: SessionsConfig | None = None) -> bool:
-    """Trade gate: must be inside a KZ, not in news block, not in lunch.
+    """Trade gate: inside an allowed window, not in news block, not in lunch.
 
-    Silver Bullet windows do NOT extend the trade gate by themselves — a
-    setup tagged Silver Bullet still needs kz_active=True at decision time
-    (which holds during NY AM 07:00-10:00 and NY PM 13:30-16:00).
+    When `cfg.allowed_windows` is None (default), any killzone or silver-bullet
+    window opens entries. When set, only the listed windows open entries.
     """
     cfg = cfg or SessionsConfig()
-    return (kz_active(dt, cfg) or silver_bullet_am(dt, cfg) or silver_bullet_pm(dt, cfg)) \
-        and not news_block(dt, cfg) and not lunch(dt, cfg)
+    if news_block(dt, cfg) or lunch(dt, cfg):
+        return False
+    t = now_ny(dt)
+    if cfg.allowed_windows is None:
+        return (
+            _in(t, cfg.london_kz)
+            or _in(t, cfg.ny_am_kz)
+            or _in(t, cfg.ny_pm_kz)
+            or _in(t, cfg.silver_bullet_am, inclusive_end=False)
+            or _in(t, cfg.silver_bullet_pm, inclusive_end=False)
+        )
+    windows = set(cfg.allowed_windows)
+    if "london_kz" in windows and _in(t, cfg.london_kz):
+        return True
+    if "ny_am_kz" in windows and _in(t, cfg.ny_am_kz):
+        return True
+    if "ny_pm_kz" in windows and _in(t, cfg.ny_pm_kz):
+        return True
+    if "silver_bullet_am" in windows and _in(t, cfg.silver_bullet_am, inclusive_end=False):
+        return True
+    if "silver_bullet_pm" in windows and _in(t, cfg.silver_bullet_pm, inclusive_end=False):
+        return True
+    return False
