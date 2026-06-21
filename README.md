@@ -265,17 +265,29 @@ Math: with 2 micros × 15 pt SL × $2/pt = **$60 per losing trade**. The $1k DD 
 
 ### Running it
 
-```bash
-# Validate wiring without sending any orders (always safe)
-python scripts/run_live.py --dry-run
+Quick start (open VSCode in the repo root and press **F5** to pick one):
 
-# Real orders (requires explicit safety confirmation)
-python scripts/run_live.py --confirm LIVE
+| Launcher (`.vscode/launch.json`) | When to use |
+| -------------------------------- | ----------- |
+| **Bot — Dry-run** | First test of the day. Connects to both bridges, runs the loop, no real orders. |
+| **Bot — LIVE ⚠** | Real orders, single process. If it crashes you have to restart manually. |
+| **Bot — Supervised LIVE ⚠** | Real orders **wrapped by the supervisor** — auto-restarts on `/restart` and on crashes (up to 5 per 10 min). **Production mode.** |
+
+Or from the terminal:
+
+```powershell
+.\.venv\Scripts\activate
+python scripts/supervisor.py --confirm LIVE      # production
+python scripts/run_live.py --dry-run             # safe wiring test
 ```
 
-The runner does a pre-flight check on both endpoints and halts if either the
-DOM2 feed has no bid/ask (e.g., weekend) or the Lucid bridge is unreachable.
-A `Ctrl-C` triggers a graceful flatten + disconnect.
+The pre-flight halts the runner if either DOM2 feed has no bid/ask
+(e.g., weekend) or the Lucid bridge is unreachable. `Ctrl-C` triggers a
+graceful flatten + disconnect.
+
+**Read [`docs/OPERATING.md`](docs/OPERATING.md) for the full daily-ops guide**:
+what the bot does hour by hour, where to look when something fails, how the
+supervisor and the shadow log work.
 
 ### Remote control via Telegram
 
