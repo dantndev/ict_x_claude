@@ -71,3 +71,21 @@ def test_limits_streak_lock():
     state.register_trade(-50.0, config=cfg)
     state.register_trade(-50.0, config=cfg)
     assert state.locked_for_streak is True
+
+
+def test_limits_streak_lock_resets_next_day():
+    """A new trading day must clear the streak lock. Previously a streak
+    halt persisted forever; pilot 003 exposed the bug."""
+    state = LimitsState()
+    cfg = LimitsConfig(daily_loss_limit_pct=10.0, max_trades_per_day=10,
+                       max_consecutive_losses=2)
+    state.reset_for_day(date(2026, 6, 1), 100_000.0)
+    state.register_trade(-50.0, config=cfg)
+    state.register_trade(-50.0, config=cfg)
+    assert state.locked_for_streak is True
+    assert not state.can_trade(config=cfg)
+
+    state.reset_for_day(date(2026, 6, 2), 99_900.0)
+    assert state.locked_for_streak is False
+    assert state.consecutive_losses == 0
+    assert state.can_trade(config=cfg)

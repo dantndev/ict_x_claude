@@ -24,11 +24,19 @@ class LimitsState:
     locked_for_streak: bool = False
 
     def reset_for_day(self, today: date, equity: float) -> None:
+        """Reset DAILY counters. Resets `consecutive_losses` and
+        `locked_for_streak` too — a new trading day deserves a fresh shot.
+
+        Without this, a streak halt persists indefinitely across days and
+        silently kills the bot for the rest of the backtest / session.
+        """
         self.starting_equity_today = equity
         self.current_day = today
         self.trades_today = 0
         self.cumulative_loss_today_usd = 0.0
         self.locked_for_day = False
+        self.consecutive_losses = 0
+        self.locked_for_streak = False
 
     def register_trade(self, pnl_usd: float, *, config: LimitsConfig) -> None:
         self.trades_today += 1

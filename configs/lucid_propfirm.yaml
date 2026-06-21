@@ -34,9 +34,16 @@ risk:
 
 setups:
   enabled: [unicorn, mss_fvg, ob_ote, silver_bullet]
-  body_atr_min: 1.5                    # canonical strict ICT thresholds
-  body_range_min: 0.6
-  min_rr: 1.5
+  # Calibration from docs/pilots/003_wf_candidates.md (winner: A_max_freq).
+  # WF 2024-01 -> 2026-03: 8/8 folds positive, aggregate OOS +0.86R, +$401k.
+  # Same expected edge as the pilot-001 nearest_pool baseline (+0.85R) but
+  # with a deterministic TP that does not depend on pool registry density,
+  # so it should be more stable in live.
+  body_atr_min: 1.0
+  body_range_min: 0.5
+  min_rr: 1.0                          # redundant when tp_strategy=fixed_R
+  tp_strategy: fixed_R                 # "nearest_pool" | "fixed_R"
+  fixed_tp_r: 1.5
 
 execution:
   dry_run: false                       # set true to validate wiring without orders
