@@ -43,6 +43,7 @@ from ict_bot.execution.runner import LiveConfig, LiveRunner
 from ict_bot.notifications import TelegramCommander, TelegramNotifier
 from ict_bot.risk.limits import LimitsConfig
 from ict_bot.risk.sizing import InstrumentSpec, RiskConfig
+from ict_bot.sessions.killzones import SessionsConfig
 from ict_bot.utils.logging import configure_logging, get_logger
 from ict_bot.utils.tz import NY, to_ny
 
@@ -173,9 +174,18 @@ def main(argv: list[str] | None = None) -> int:
         enforce_force_flat=bool(exec_cfg["enforce_force_flat"]),
     )
     kill = KillSwitch()
+
+    # Build SessionsConfig honoring the optional allowed_windows filter
+    # (Silver-Bullet-only is recommended per pilot 005 docs).
+    allowed = exec_cfg.get("allowed_windows")
+    sessions_cfg = (
+        SessionsConfig(allowed_windows=tuple(allowed)) if allowed else SessionsConfig()
+    )
+
     runner = LiveRunner(
         broker=broker, config=live_cfg,
         instrument=instrument, risk=risk, limits=limits,
+        sessions_config=sessions_cfg,
         kill_switch=kill,
     )
 

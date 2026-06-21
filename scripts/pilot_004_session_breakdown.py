@@ -18,7 +18,6 @@ import json
 import sys
 from collections import defaultdict
 from datetime import date, datetime
-from pathlib import Path
 from statistics import fmean
 
 import polars as pl

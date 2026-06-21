@@ -29,7 +29,11 @@ risk:
   max_quantity: 2                     # never more than 2 micros at once
   min_quantity: 1
   daily_loss_limit_pct: 1.0           # $250 → matches account.daily_loss_limit_usd
-  max_consecutive_losses: 3           # 3 SLs in a row = halt (≈ $180 lost = 18% DD)
+  # Pilot 005 backtest 2024-2026 showed max consecutive losses = 3 with
+  # Silver-Bullet-only mode (vs 6 with all killzones). Setting the cap at 4
+  # gives 1 trade of margin so the bot is not paused exactly at the worst-
+  # case streak observed; tightening to 3 is OK but expect manual unlocks.
+  max_consecutive_losses: 4
   max_trades_per_day: 5               # cap frequency in bad sessions
 
 setups:
@@ -51,3 +55,11 @@ execution:
   enforce_midnight_filter: true
   enforce_force_flat: true             # close all at 16:30 NY
   starting_equity_for_sizing: 25000.0  # used by RiskConfig.size_position()
+  # Session filter — pilot 005 (docs/pilots/005_session_mode_comparison.md)
+  # showed Silver-Bullet-only mode beats all alternatives on every risk
+  # metric (MaxDD halved, p95 DD ~1/3, peor trade -40%, max consec losers
+  # 3 vs 6) while keeping 81% of total PnL. Operating only 10-11 NY and
+  # 14-15 NY also matches the user's awake schedule.
+  allowed_windows:
+    - silver_bullet_am
+    - silver_bullet_pm

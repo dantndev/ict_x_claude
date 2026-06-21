@@ -25,10 +25,9 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
-from pathlib import Path
 
 from ict_bot.backtest.engine import BacktestConfig
-from ict_bot.backtest.runner import PipelineConfig, run_pipeline
+from ict_bot.backtest.runner import PipelineConfig
 from ict_bot.config.settings import REPO_ROOT
 from ict_bot.data.loaders.cme_csv import load_cme_csv
 from ict_bot.data.resampler import resample
@@ -149,11 +148,8 @@ def main() -> int:
             if wf_per_fold else None
         )
 
-        # Full period — pass our session-filtered config through engine
-        full = run_pipeline(
-            bars, pipeline_config=pcfg, backtest_config=bcfg,
-        )
-        # Re-run with our sessions filter (engine accepts SessionsConfig)
+        # Full period with the session-filtered config — bypass run_pipeline
+        # because the runner doesn't take SessionsConfig directly.
         from ict_bot.backtest.engine import run_backtest as _run
         from ict_bot.backtest.runner import detect_all_signals as _detect
         signals = _detect(bars, cfg=pcfg)

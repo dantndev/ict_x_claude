@@ -78,23 +78,18 @@ def new_entries_allowed(dt: datetime, cfg: SessionsConfig | None = None) -> bool
     if news_block(dt, cfg) or lunch(dt, cfg):
         return False
     t = now_ny(dt)
+    window_checks = {
+        "london_kz": (cfg.london_kz, True),
+        "ny_am_kz": (cfg.ny_am_kz, True),
+        "ny_pm_kz": (cfg.ny_pm_kz, True),
+        "silver_bullet_am": (cfg.silver_bullet_am, False),
+        "silver_bullet_pm": (cfg.silver_bullet_pm, False),
+    }
     if cfg.allowed_windows is None:
-        return (
-            _in(t, cfg.london_kz)
-            or _in(t, cfg.ny_am_kz)
-            or _in(t, cfg.ny_pm_kz)
-            or _in(t, cfg.silver_bullet_am, inclusive_end=False)
-            or _in(t, cfg.silver_bullet_pm, inclusive_end=False)
-        )
-    windows = set(cfg.allowed_windows)
-    if "london_kz" in windows and _in(t, cfg.london_kz):
-        return True
-    if "ny_am_kz" in windows and _in(t, cfg.ny_am_kz):
-        return True
-    if "ny_pm_kz" in windows and _in(t, cfg.ny_pm_kz):
-        return True
-    if "silver_bullet_am" in windows and _in(t, cfg.silver_bullet_am, inclusive_end=False):
-        return True
-    if "silver_bullet_pm" in windows and _in(t, cfg.silver_bullet_pm, inclusive_end=False):
-        return True
-    return False
+        return any(_in(t, w, inclusive_end=incl) for w, incl in window_checks.values())
+    selected = set(cfg.allowed_windows)
+    return any(
+        _in(t, w, inclusive_end=incl)
+        for name, (w, incl) in window_checks.items()
+        if name in selected
+    )
