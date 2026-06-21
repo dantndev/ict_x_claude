@@ -18,7 +18,7 @@ from ict_bot.data.loaders.l2_csv import (
 )
 from ict_bot.data.loaders.ohlcv_http import fetch_ohlcv_1m
 from ict_bot.data.models import Bars, Ticks, Timeframe
-from ict_bot.data.resampler import resample
+from ict_bot.data.resampler import bars_from_ticks, resample
 from ict_bot.data.validators import (
     check_bar_duplicates,
     check_bar_gaps,
@@ -30,6 +30,7 @@ __all__ = [
     "Bars",
     "Ticks",
     "Timeframe",
+    "bars_from_ticks",
     "check_bar_duplicates",
     "check_bar_gaps",
     "check_bar_timezone",
