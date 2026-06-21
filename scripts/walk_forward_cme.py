@@ -52,6 +52,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--min-rr", type=float, default=1.5)
     p.add_argument("--no-killzones", action="store_true")
     p.add_argument("--no-midnight-filter", action="store_true")
+    p.add_argument("--tp-strategy", default="nearest_pool",
+                   choices=["nearest_pool", "fixed_R"])
+    p.add_argument("--fixed-tp-r", type=float, default=2.0)
     p.add_argument("--output-dir", default=str(REPO_ROOT / "reports" / "validation"))
     args = p.parse_args(argv)
 
@@ -74,10 +77,22 @@ def main(argv: list[str] | None = None) -> int:
             body_range_min=args.body_range_min,
         ),
         fvg=FVGConfig(require_displacement=True, min_gap_ticks=1, tick_size=0.25),
-        unicorn=UnicornConfig(min_rr=args.min_rr),
-        mss_fvg=MssFvgConfig(min_rr=args.min_rr),
-        ob_ote=ObOteConfig(min_rr=args.min_rr),
-        silver_bullet=SilverBulletConfig(min_rr=args.min_rr),
+        unicorn=UnicornConfig(
+            min_rr=args.min_rr,
+            tp_strategy=args.tp_strategy, fixed_tp_r=args.fixed_tp_r,
+        ),
+        mss_fvg=MssFvgConfig(
+            min_rr=args.min_rr,
+            tp_strategy=args.tp_strategy, fixed_tp_r=args.fixed_tp_r,
+        ),
+        ob_ote=ObOteConfig(
+            min_rr=args.min_rr,
+            tp_strategy=args.tp_strategy, fixed_tp_r=args.fixed_tp_r,
+        ),
+        silver_bullet=SilverBulletConfig(
+            min_rr=args.min_rr,
+            tp_strategy=args.tp_strategy, fixed_tp_r=args.fixed_tp_r,
+        ),
     )
     bcfg = BacktestConfig(
         enforce_killzones=not args.no_killzones,
