@@ -6,7 +6,7 @@ Algorithmic trading bot built on the **Inner Circle Trader (ICT)** methodology, 
 
 ---
 
-## Status — all 10 phases shipped
+## Status — all 10 phases shipped + Quantower integration
 
 | # | Phase | Done |
 | - | ----- | ---- |
@@ -20,13 +20,15 @@ Algorithmic trading bot built on the **Inner Circle Trader (ICT)** methodology, 
 | 7 | Robustness (walk-forward with embargo, Monte Carlo bootstrap, sensitivity sweep) | ✅ |
 | 8 | Optional ML confirmation filter on L2 microstructure features                    | ✅ |
 | 9 | Execution layer (Broker contract, paper broker, kill switch, live runner)        | ✅ |
+| 9b| **Quantower live adapter** (DOM2 feed + Lucid executor, prop-firm config)        | ✅ |
 
 Verification:
 
-- **84/84** unit tests pass
-- `mypy --strict` clean (75 source files)
+- **92/92** unit tests pass (8 new Quantower tests with stubbed HTTP)
+- `mypy --strict` clean (79 source files)
 - `ruff` clean
 - E2E pipeline runs over **5 years of CME OHLCV** and **36 sessions of L2 ticks**
+- Live runner connects to real DOM2 + Lucid; pre-flight halt is verified on a closed market
 
 ---
 
@@ -163,16 +165,52 @@ See [`ROADMAP.md`](./ROADMAP.md) for the phase-by-phase plan and [`STRATEGY.md`]
 
 ---
 
-## Going to production
+## Going to production — Quantower + Lucid (Rithmic prop)
 
 The execution layer ships with:
 
 - `Broker` abstract contract (any concrete broker — IBKR, Tradovate, Rithmic — implements it).
 - `PaperBroker` in-memory implementation, parity-tested against the backtest engine.
+- **`QuantowerBroker`** — concrete adapter wiring two local bridges that already run inside Quantower:
+  - **DOM2 feed** at `http://localhost:8080/dom2` (nested JSON: `microstructure` / `footprint` / `dom`)
+  - **Lucid executor** at `http://localhost:6001` (`/orders`, `/health`, `/position`, `/modify_sl`, `/flatten`)
+  - Symbol split: data from **`ENQU26`** (E-mini NQ, Sep 2026), orders on **`MNQU26`** (Micro NQ, $2/point)
 - `KillSwitch` (manual or automatic trip on daily loss / consecutive losses).
 - `LiveRunner` orchestrating detectors → sessions gating → broker, with Midnight Open filter and force-flatten at 16:30 NY.
 
-A live deployment still requires choosing a concrete broker, wiring its streaming feed into the runner, and running paper for N sessions with results matching the backtest expectation within tolerance. None of that is automated yet — by design.
+### Prop-firm configuration (Lucid Trading $25k / $1k DD)
+
+`configs/lucid_propfirm.yaml` encodes the account constraints as hard killswitches:
+
+```yaml
+account:
+  capital_usd: 25000
+  max_drawdown_usd: 1000          # hard cap from the prop firm
+  daily_loss_limit_usd: 250       # 25% of total DD budget — stops the day early
+
+risk:
+  per_trade_risk_pct: 0.24        # ~$60 risk on $25k = 6% of DD per SL hit
+  max_quantity: 2                 # never more than 2 micros at a time
+  daily_loss_limit_pct: 1.0       # $250
+  max_consecutive_losses: 3       # 3 SLs in a row halts the day (~$180 lost = 18% DD)
+  max_trades_per_day: 5           # frequency cap in volatile sessions
+```
+
+Math: with 2 micros × 15 pt SL × $2/pt = **$60 per losing trade**. The $1k DD budget allows ~16 full-stops before the account is closed. The killswitches cap a bad day at $250 (≈4 stops) so the budget never depletes in a single session.
+
+### Running it
+
+```bash
+# Validate wiring without sending any orders (always safe)
+python scripts/run_live.py --dry-run
+
+# Real orders (requires explicit safety confirmation)
+python scripts/run_live.py --confirm LIVE
+```
+
+The runner does a pre-flight check on both endpoints and halts if either the
+DOM2 feed has no bid/ask (e.g., weekend) or the Lucid bridge is unreachable.
+A `Ctrl-C` triggers a graceful flatten + disconnect.
 
 ---
 

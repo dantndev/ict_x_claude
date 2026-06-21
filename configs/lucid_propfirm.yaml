@@ -1,0 +1,46 @@
+# Lucid Trading prop-firm account profile.
+# Account size: $25,000  |  Max drawdown: $1,000  |  No time limit
+#
+# Critical math:
+#   - MNQ contract: $2/point, $0.50/tick (0.25 pt tick size)
+#   - Default trade: 2 micros × 15 pt SL = $60 risk/trade
+#   - $1,000 DD / $60 = ~16 max consecutive full-stops (zero tolerance for sloppy days)
+#
+# Therefore the killswitches must be aggressive.
+
+account:
+  broker: lucid_quantower
+  capital_usd: 25000.0
+  max_drawdown_usd: 1000.0           # hard cap, account is suspended past this
+  max_drawdown_pct: 4.0
+  daily_loss_limit_usd: 250.0        # cuts a bad day at 25% of total DD budget
+  data_symbol: ENQU26                # E-mini NQ Sep 2026 (M=Jun expired 2026-06)
+  exec_symbol: MNQU26                # Micro NQ Sep 2026
+
+connection:
+  dom2_url: http://localhost:8080/dom2
+  lucid_url: http://localhost:6001
+  poll_hz: 2                          # 2 reads/sec is more than enough for 1m bars
+  bar_window_minutes: 240             # rolling window of bars given to detectors
+  reconnect_threshold_sec: 10
+
+risk:
+  per_trade_risk_pct: 0.24            # ~$60 on $25k → 1 SL ≈ 6% of DD budget
+  max_quantity: 2                     # never more than 2 micros at once
+  min_quantity: 1
+  daily_loss_limit_pct: 1.0           # $250 → matches account.daily_loss_limit_usd
+  max_consecutive_losses: 3           # 3 SLs in a row = halt (≈ $180 lost = 18% DD)
+  max_trades_per_day: 5               # cap frequency in bad sessions
+
+setups:
+  enabled: [unicorn, mss_fvg, ob_ote, silver_bullet]
+  body_atr_min: 1.5                    # canonical strict ICT thresholds
+  body_range_min: 0.6
+  min_rr: 1.5
+
+execution:
+  dry_run: false                       # set true to validate wiring without orders
+  enforce_killzones: true
+  enforce_midnight_filter: true
+  enforce_force_flat: true             # close all at 16:30 NY
+  starting_equity_for_sizing: 25000.0  # used by RiskConfig.size_position()
