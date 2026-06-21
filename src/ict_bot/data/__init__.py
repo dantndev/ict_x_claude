@@ -11,6 +11,7 @@ Public API:
     check_bar_timezone           — validators
 """
 
+from ict_bot.data.loaders.cme_csv import load_cme_csv
 from ict_bot.data.loaders.l2_csv import (
     list_available_days,
     load_day,
@@ -37,6 +38,7 @@ __all__ = [
     "check_tick_monotonicity",
     "fetch_ohlcv_1m",
     "list_available_days",
+    "load_cme_csv",
     "load_day",
     "load_range",
     "resample",

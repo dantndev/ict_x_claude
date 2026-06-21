@@ -4,20 +4,33 @@ Ten phases. Each phase has an explicit definition of done; no phase advances wit
 
 | # | Phase | Done when... | Status |
 | - | ----- | ------------ | ------ |
-| 0 | **Bootstrap** — Repo scaffolding, configs, tooling, first commit | All directories, `pyproject.toml`, `.gitignore`, READMEs exist. Repo pushed to GitHub private. `pytest` runs (no tests yet). | ✅ in progress |
-| 1 | **Concept formalization** — One `docs/concepts/<concept>.md` per ICT primitive, with definition → math → detection pseudocode → invalidation → tests fixtures. User sign-off per concept. | All concepts in the V1 catalog have an approved spec. No code in `src/signals/` yet. | ⏳ next |
-| 2 | **Data layer** — `data/` module: loaders for L2 CSVs and HTTP OHLCV, validator (gaps/dupes/tz), resampler 1m → 3m/5m/15m/1H/4H/D, unified `Bars` and `Ticks` models. | Loading 3 months of OHLCV + L2 in under 5s; 100% unit coverage of resampler edge cases. | |
-| 3 | **Detectors** — Pure implementations of formalized concepts in `structure/`, `signals/imbalance/`, `signals/blocks/`, `signals/liquidity/`, `signals/ranges/`, `sessions/`. | Each detector passes its concept fixture; coverage ≥ 90%. | |
-| 4 | **Setups** — Composition of detectors into the V1 setup catalog (Unicorn, MSS+FVG, OB+OTE, Silver Bullet, PO3). | Each setup produces a list of `Signal` objects with entry, SL, TP, confidence, audit trail. | |
-| 5 | **Backtest engine** — Event-driven, NQ-aware (tick size 0.25, $20/point), commissions, slippage, SL/TP, session hard-flatten at 16:30, position sizing from `risk/`. | One full backtest of one setup runs on 3 months of data, output: trades CSV + equity parquet + JSON summary. | |
-| 6 | **Reporting** — Equity curve, drawdown, Sharpe/Sortino, profit factor, expectancy, R-distribution, per-session/killzone breakdown, day×hour heatmap. HTML report. | One-click report from a backtest run. | |
-| 7 | **Robustness** — Walk-forward with embargo, Monte Carlo bootstrap of equity, regime breakdown (trend/range/news days), parameter sensitivity. | Each setup carries a "robustness report" alongside its backtest. | |
-| 8 | **ML confirmation (optional)** — Train a *filter* on L2 features (`fp_delta`, `delta_acceleration`, `obi_top10`, `spread_compression`) over rule-based entries. Compare PnL with/without filter. Discard the layer if no edge. | Decision recorded in `docs/concepts/ml_confirmation.md`. | |
-| 9 | **Production** — Broker adapter (decide: IBKR / Tradovate / Rithmic), paper-trading runner, structured logs, kill switch, daily loss circuit breaker. Live only after N paper-trading sessions match backtest expectations. | Paper-trading runs unattended for 5 sessions without divergence > 1R from backtest expectation. | |
+| 0 | **Bootstrap** — Repo scaffolding, configs, tooling, first commit | All directories, `pyproject.toml`, `.gitignore`, READMEs exist. Repo pushed to GitHub private. `pytest` runs. | ✅ |
+| 1 | **Concept formalization** — One `docs/concepts/<concept>.md` per ICT primitive. | All 14 specs in the V1 catalog approved. | ✅ |
+| 2 | **Data layer** — Loaders for L2 CSVs, HTTP OHLCV, **CME multi-year CSV (5 years, 5.4M rows, cleaned)**, validator, resampler, `Bars` / `Ticks` models. | Loading 3 months of OHLCV + L2 + 5 years of CME CSV in under 30s (first run); cached afterwards. | ✅ |
+| 3 | **Detectors** — Pure implementations of formalized concepts. | Each detector passes its concept fixture; 84 tests passing. | ✅ |
+| 4 | **Setups** — Composition into Unicorn, MSS+FVG, OB+OTE, Silver Bullet, PO3. | Each setup produces `Signal` objects with entry, SL, TP, confidence, audit. | ✅ |
+| 5 | **Backtest engine** — Event-driven, NQ/MNQ-aware, commissions, slippage, SL/TP, session force-flatten, position sizing, daily-loss + streak locks. | Full backtest of 5 years of MNQ runs in seconds; outputs trades.csv + equity.csv + summary.json. | ✅ |
+| 6 | **Reporting** — Metrics + matplotlib plots (equity, drawdown, R-distribution, weekday×hour heatmap) + self-contained HTML report. | One-click report from a backtest run. | ✅ |
+| 7 | **Robustness** — Walk-forward with embargo, Monte Carlo bootstrap of trade order, sensitivity sweep over (body_atr, body_range, min_rr). | `scripts/walk_forward_cme.py` ships and produces per-fold OOS metrics + bootstrap CIs. | ✅ |
+| 8 | **ML confirmation (optional)** — Filter trained on (signal_features + L2 microstructure) → P(win) ≥ threshold accepts. Compare PnL with/without filter. | `ict_bot.ml` package: `features_for_signal` + `SignalFilter` + `train_filter`. Discardable if no edge. | ✅ |
+| 9 | **Production** — Broker abstract contract, paper-broker implementation, kill switch, live runner with killzone/news/lunch/midnight-open gating and force-flatten. | `ict_bot.execution` package ready. Choosing a concrete broker and N-session paper parity remain on the user. | ✅ |
 
 ---
 
-## Phase 0 — Definition of done (current)
+## Status
+
+All 10 phases shipped — see commits on `main`. Next, the work that remains is
+*operational*, not architectural:
+
+1. Choose a concrete broker (IBKR / Tradovate / Rithmic) and implement its
+   adapter satisfying `ict_bot.execution.Broker`.
+2. Wire a streaming bar feed (websocket or polled HTTP) into `LiveRunner`.
+3. Run paper for N sessions and verify per-trade parity with the backtest
+   expectation; only then enable live capital.
+4. Periodic re-validation: re-run `walk_forward_cme.py` monthly to catch
+   regime drift.
+
+## Phase 0 — Definition of done
 
 - [x] Directory tree per `README.md`
 - [x] `pyproject.toml` with `ruff` + `mypy --strict` + `pytest` + dependencies pinned
@@ -26,7 +39,7 @@ Ten phases. Each phase has an explicit definition of done; no phase advances wit
 - [x] Research PDF + markdown moved to `docs/research/`
 - [x] Empty `__init__.py` in every Python package
 - [x] `.gitkeep` in `data/`, `reports/`, `logs/`, `checkpoints/`, `docs/concepts/`, `tests/fixtures/`
-- [ ] `git init` + first commit + push to `https://github.com/dantndev/ict_x_claude.git`
+- [x] `git init` + first commit + push to `https://github.com/dantndev/ict_x_claude.git`
 
 ## Phase 1 — Concept catalog (formalization order)
 

@@ -19,9 +19,9 @@ from ict_bot.signals.imbalance.fvg import FVGConfig, detect_fvgs, invalidate_fvg
 from ict_bot.signals.liquidity.pools import pools_from_swings
 from ict_bot.signals.liquidity.sweep import detect_sweeps_and_consumptions
 from ict_bot.signals.setups.base import Signal
-from ict_bot.signals.setups.mss_fvg import detect_mss_fvg
-from ict_bot.signals.setups.ob_ote import detect_ob_ote
-from ict_bot.signals.setups.silver_bullet import detect_silver_bullet
+from ict_bot.signals.setups.mss_fvg import MssFvgConfig, detect_mss_fvg
+from ict_bot.signals.setups.ob_ote import ObOteConfig, detect_ob_ote
+from ict_bot.signals.setups.silver_bullet import SilverBulletConfig, detect_silver_bullet
 from ict_bot.signals.setups.unicorn import UnicornConfig, detect_unicorns
 from ict_bot.structure.displacement import (
     DisplacementConfig,
@@ -45,6 +45,9 @@ class PipelineConfig:
         ),
     )
     unicorn: UnicornConfig = field(default_factory=UnicornConfig)
+    mss_fvg: MssFvgConfig = field(default_factory=MssFvgConfig)
+    ob_ote: ObOteConfig = field(default_factory=ObOteConfig)
+    silver_bullet: SilverBulletConfig = field(default_factory=SilverBulletConfig)
     setups: tuple[str, ...] = ("unicorn", "mss_fvg", "ob_ote", "silver_bullet")
 
 
@@ -73,11 +76,11 @@ def detect_all_signals(bars: Bars, *, cfg: PipelineConfig | None = None) -> list
     if "unicorn" in cfg.setups:
         signals.extend(detect_unicorns(bars, breakers, fvgs, pools, config=cfg.unicorn))
     if "mss_fvg" in cfg.setups:
-        signals.extend(detect_mss_fvg(bars, mss_events, fvgs, pools))
+        signals.extend(detect_mss_fvg(bars, mss_events, fvgs, pools, config=cfg.mss_fvg))
     if "ob_ote" in cfg.setups:
-        signals.extend(detect_ob_ote(bars, obs, pools))
+        signals.extend(detect_ob_ote(bars, obs, pools, config=cfg.ob_ote))
     if "silver_bullet" in cfg.setups:
-        signals.extend(detect_silver_bullet(bars, fvgs, pools))
+        signals.extend(detect_silver_bullet(bars, fvgs, pools, config=cfg.silver_bullet))
     log.info("signals_total", count=len(signals))
     return signals
 

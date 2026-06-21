@@ -7,6 +7,10 @@ symbol:
   exchange: CME
   description: "E-mini Nasdaq-100 Futures, June 2026"
 
+# E-mini NQ specs (config family "NQ"):
+#   tick_size 0.25 pt, tick_value $5.00, point_value $20
+# Micro MNQ specs (config family "MNQ"):
+#   tick_size 0.25 pt, tick_value $0.50, point_value $2
 instrument:
   tick_size: 0.25            # points
   tick_value_usd: 5.00       # $5 per tick (= $20 per point) on the E-mini NQ

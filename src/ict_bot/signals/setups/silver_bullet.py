@@ -29,6 +29,7 @@ class SilverBulletConfig:
     tick_size: float = 0.25
     min_rr: float = 1.5
     fallback_tp_r: float = 3.0
+    min_tp_distance_in_risks: float = 1.0
 
 
 def detect_silver_bullet(
@@ -58,21 +59,22 @@ def detect_silver_bullet(
         if mid >= len(lows):
             continue
         sl = lows[mid] - offset if g.direction == Direction.BULL else highs[mid] + offset
+        risk = abs(entry - sl)
+        if risk <= 0:
+            continue
+        min_tp_dist = cfg.min_tp_distance_in_risks * risk
         if g.direction == Direction.BULL:
             tp_pool = min(
-                (p for p in pools if p.side == Side.BSL and p.price > entry),
+                (p for p in pools if p.side == Side.BSL and (p.price - entry) >= min_tp_dist),
                 key=lambda p: p.price - entry,
                 default=None,
             )
         else:
             tp_pool = min(
-                (p for p in pools if p.side == Side.SSL and p.price < entry),
+                (p for p in pools if p.side == Side.SSL and (entry - p.price) >= min_tp_dist),
                 key=lambda p: entry - p.price,
                 default=None,
             )
-        risk = abs(entry - sl)
-        if risk <= 0:
-            continue
         tp = (
             tp_pool.price
             if tp_pool is not None

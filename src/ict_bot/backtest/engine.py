@@ -92,7 +92,7 @@ def _midnight_opens(bars: Bars) -> dict[str, float]:
     return out
 
 
-def run_backtest(  # noqa: PLR0912, PLR0915
+def run_backtest(  # noqa: PLR0912
     bars: Bars,
     signals: list[Signal],
     *,

@@ -78,6 +78,15 @@ select = [
 ]
 ignore = [
     "PLR0913",  # too many args (common in detector signatures)
+    "PLR0915",  # too many statements (CLI scripts)
+    "PLR2004",  # magic values (numeric thresholds are intentional config)
+    "PLC0415",  # in-function imports (lazy optional deps)
+    "N806",     # var name X (matrix variable convention in ML)
+    "N818",     # exception name without Error suffix (KillSwitchTripped is intentional)
+    "SIM108",   # ternary suggestion (verbose if/else is clearer here)
+    "RUF001",   # ambiguous chars in strings (× in user-facing labels)
+    "RUF002",   # ambiguous chars in docstrings (× / em-dash in prose)
+    "E501",     # long lines (only triggered in docstring formatting now)
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -97,6 +106,10 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*", "matplotlib.*", "plotly.*", "xgboost.*", "lightgbm.*", "joblib.*", "seaborn.*"]
+ignore_missing_imports = true
 
 # ───────────────────────────── PyTest ───────────────────────────
 [tool.pytest.ini_options]

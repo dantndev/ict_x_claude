@@ -1,0 +1,30 @@
+# MNQ (Micro E-mini Nasdaq-100) — instrument specs.
+# CME futures, electronic; quarterly contracts (H/M/U/Z).
+
+symbol:
+  family: MNQ
+  contract: MNQU6
+  exchange: CME
+  description: "Micro E-mini Nasdaq-100 Futures, continuous front-month"
+
+instrument:
+  tick_size: 0.25            # points
+  tick_value_usd: 0.50       # $0.50 per tick (= $2 per point) on Micro
+  point_value_usd: 2.00
+  currency: USD
+  trading_hours_ny:
+    open: "18:00"
+    close: "17:00"
+    daily_break: ["17:00", "18:00"]
+
+commissions:
+  per_side_usd: 0.40         # micro contracts run cheaper than the e-mini
+  slippage_ticks: 1
+
+risk_overrides:
+  per_trade_risk_pct: 0.5
+  max_trades_per_day: 8      # micro size allows more attempts per day
+
+structure_overrides:
+  displacement:
+    body_atr_min: 1.5

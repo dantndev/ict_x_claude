@@ -22,6 +22,7 @@ class MssFvgConfig:
     min_rr: float = 1.5
     fallback_tp_r: float = 3.0
     fvg_lookback_bars: int = 8
+    min_tp_distance_in_risks: float = 1.0
 
 
 def detect_mss_fvg(
@@ -59,22 +60,22 @@ def detect_mss_fvg(
         mid = g.anchor_index + 1
         offset = cfg.sl_offset_ticks * cfg.tick_size
         sl = lows[mid] - offset if ev.direction == Direction.BULL else highs[mid] + offset
-        # TP
+        risk = abs(entry - sl)
+        if risk <= 0:
+            continue
+        min_tp_dist = cfg.min_tp_distance_in_risks * risk
         if ev.direction == Direction.BULL:
             tp_pool = min(
-                (p for p in pools if p.side == Side.BSL and p.price > entry),
+                (p for p in pools if p.side == Side.BSL and (p.price - entry) >= min_tp_dist),
                 key=lambda p: p.price - entry,
                 default=None,
             )
         else:
             tp_pool = min(
-                (p for p in pools if p.side == Side.SSL and p.price < entry),
+                (p for p in pools if p.side == Side.SSL and (entry - p.price) >= min_tp_dist),
                 key=lambda p: entry - p.price,
                 default=None,
             )
-        risk = abs(entry - sl)
-        if risk <= 0:
-            continue
         if tp_pool is not None:
             tp = tp_pool.price
         else:

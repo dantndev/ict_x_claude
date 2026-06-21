@@ -64,7 +64,7 @@ def _update_state(last: _Last) -> State:
     return "RANGE"
 
 
-def detect_structure_events(  # noqa: PLR0912, PLR0915
+def detect_structure_events(  # noqa: PLR0912
     bars: Bars,
     swings: list[Swing],
     *,

@@ -72,26 +72,24 @@ def detect_unicorns(
     ts_ny = bars.df.get_column("ts_ny").to_list()
     out: list[Signal] = []
     for b in breakers:
+        # Unicorn pairs the Breaker with an FVG of the SAME direction as the
+        # trade (= Breaker.direction), anchored during the leg that BROKE the
+        # origin OB (between sweep_index and invalidator_index). This is the
+        # "breaking leg" per concept 14 — distinct from the OB's origin leg.
         same_dir_fvgs = [g for g in fvgs if g.direction == b.direction]
-        leg = b.origin_ob.leg_ref
-        window = max(1, int(leg.length * cfg.same_leg_window_factor))
+        breaking_lo = max(0, b.sweep_index)
+        breaking_hi = b.invalidator_index
+        # OTE zone is computed on the ORIGIN leg's price range as the reference.
+        z_origin = ote_zone(b.origin_ob.leg_ref).zone
         for g in same_dir_fvgs:
-            # Same-leg (relaxed) — FVG must anchor within window of the leg
-            if not (leg.start_index - window <= g.anchor_index <= leg.end_index + window):
+            if not (breaking_lo <= g.anchor_index <= breaking_hi):
                 continue
             inter = b.range.intersection(g.range)
             if inter is None:
                 continue
-            # OTE confluence (optional)
-            inside_ote = False
-            if cfg.require_inside_ote:
-                z = ote_zone(leg).zone
-                if inter.intersects(z) is False:
-                    continue
-                inside_ote = True
-            else:
-                z = ote_zone(leg).zone
-                inside_ote = inter.intersects(z)
+            inside_ote = inter.intersects(z_origin)
+            if cfg.require_inside_ote and not inside_ote:
+                continue
 
             entry = _proximal_edge(inter.low, inter.high, b.direction)
             sl_anchor = _fvg_anchor_extreme(bars, g, b.direction)
