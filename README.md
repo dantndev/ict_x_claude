@@ -6,7 +6,7 @@ Algorithmic trading bot built on the **Inner Circle Trader (ICT)** methodology, 
 
 ---
 
-## Status — all 10 phases shipped + Quantower integration
+## Status — Production-ready (Silver Bullet mode B on Lucid prop)
 
 | # | Phase | Done |
 | - | ----- | ---- |
@@ -20,15 +20,78 @@ Algorithmic trading bot built on the **Inner Circle Trader (ICT)** methodology, 
 | 7 | Robustness (walk-forward with embargo, Monte Carlo bootstrap, sensitivity sweep) | ✅ |
 | 8 | Optional ML confirmation filter on L2 microstructure features                    | ✅ |
 | 9 | Execution layer (Broker contract, paper broker, kill switch, live runner)        | ✅ |
-| 9b| **Quantower live adapter** (DOM2 feed + Lucid executor, prop-firm config)        | ✅ |
+| 9b| Quantower live adapter (DOM2 feed + Lucid executor, prop-firm config)            | ✅ |
+| 9c| Telegram remote control (notifier + commander, /status /pause /flatten ...)      | ✅ |
+| P1| Pilot 001 — threshold sensitivity sweep                                          | ✅ |
+| P2| Pilot 002 — fixed-R TP strategy added to all setups                              | ✅ |
+| P3| Pilot 003 — walk-forward of 3 fixed-R candidates → winner A_max_freq             | ✅ |
+| P4| Pilot 004 — per-killzone breakdown (87% of edge in Silver Bullet windows)        | ✅ |
+| P5| Pilot 005 — session-mode comparison (B beats A/C on every risk metric)           | ✅ |
+| Px| **Production hardening** — news_block fix, max_losses=10, shadow logger          | ✅ |
 
 Verification:
 
-- **92/92** unit tests pass (8 new Quantower tests with stubbed HTTP)
-- `mypy --strict` clean (79 source files)
+- **102/102** unit tests pass
+- `mypy --strict` clean (83 source files)
 - `ruff` clean
 - E2E pipeline runs over **5 years of CME OHLCV** and **36 sessions of L2 ticks**
 - Live runner connects to real DOM2 + Lucid; pre-flight halt is verified on a closed market
+- Production config in `configs/lucid_propfirm.yaml` reflects pilot 005 winner
+
+## Currently deployed parameters
+
+Based on the pilots 001-005 (`docs/pilots/`), the production config trades
+exclusively in the two **Silver Bullet** windows — the ICT-canonical
+"macros" where the bot captures **87% of historical PnL** with **35% of the
+trades** vs the all-killzone baseline.
+
+```yaml
+# configs/lucid_propfirm.yaml
+account:
+  capital_usd: 25000.0
+  max_drawdown_usd: 1000.0
+  data_symbol: ENQU26
+  exec_symbol: MNQU26
+
+setups:
+  body_atr_min: 1.0
+  body_range_min: 0.5
+  tp_strategy: fixed_R
+  fixed_tp_r: 1.5
+
+execution:
+  allowed_windows:                # Silver Bullet ONLY (pilot 005 winner)
+    - silver_bullet_am            # 10:00-11:00 NY
+    - silver_bullet_pm            # 14:00-15:00 NY
+
+risk:
+  max_consecutive_losses: 10      # user-set noisy-day stop
+  max_trades_per_day: 5
+  daily_loss_limit_pct: 1.0       # $250 hard daily cap
+```
+
+Backtest expectation with this config (2024-01 → 2026-03, IS-biased,
+treat as direction not magnitude):
+
+- 283 trades, **68% win rate**, +1.41 R/trade
+- MaxDD 0.44% ($8.7k on a $2M-equiv account; scaled to your $25k it's
+  ~$110 worst observed drawdown)
+- Bootstrap p95 DD 4.52%; 100% probability of profit across 1000
+  shuffled trade orderings
+
+## Shadow signal logger (analyze mode A/C while running mode B)
+
+`logs/shadow/<YYYY-MM-DD>.csv` is written for **every** signal the bot
+detects in live, regardless of whether it executed. Each row carries
+`in_mode_A`, `in_mode_B`, `in_mode_C` flags + the killzone tag + the
+skip reason. So you can answer at any time:
+
+- "If I had switched to mode C this week, how many extra trades?"
+- "Which killzone is producing the most rejected signals now?"
+- "Did the win rate of SB stay constant after a regime change?"
+
+…without re-running any backtest. The logger is thread-safe and never
+blocks the trading loop.
 
 ---
 
@@ -249,46 +312,35 @@ Independent scripts that test specific changes against the 5-year CME data to
 quantify their effect on **frequency vs edge** before touching the production
 config. Each pilot writes its artifacts under `reports/pilots/<run_id>/`.
 
-### Pilot 1 — Threshold sensitivity sweep (live)
+### Pilots — finished
 
-`scripts/pilot_sensitivity_sweep.py` runs the full pipeline across a grid of
-`(body_atr_min, body_range_min, min_rr)`. For each cell it records `n_trades`,
-`trades_per_day`, `expectancy_R`, `total_pnl_usd`, `max_dd_pct` and writes:
+Each pilot is independent and re-runnable. Full reports in `docs/pilots/`.
 
-- `grid.csv` — the full grid for spreadsheet analysis
-- `report.md` — top-10 and worst-5 cells in markdown
-- `summary.json` — run metadata + best cell
+| # | Pilot | Outcome | Doc |
+| - | ----- | ------- | --- |
+| 001 | Threshold sensitivity sweep (27 cells) | Found `min_rr=1.5` was a hidden cap. Plateau at `(body_atr=1.0, body_range=0.5, min_rr=1.0)`. | `docs/pilots/001_sensitivity_sweep.md` |
+| 002 | Fixed-R TP strategy added to all setups | Fixed-R beats nearest_pool across the frontier. `min_rr` becomes redundant under fixed_R. Best cells: `(1.0, 0.5, fixed=1.5)` and `(1.5, 0.5, fixed=2.0)`. | `docs/pilots/002_fixed_tp.md` |
+| 003 | Walk-forward of 3 fixed-R candidates | Winner = `(1.0, 0.5, fixed_tp_r=1.5)`. 8/8 folds positive, +0.86R OOS. Bug fix shipped (`LimitsState.reset_for_day` was leaking streak lock across days). | `docs/pilots/003_wf_candidates.md` |
+| 004 | Per-killzone PnL breakdown (winner cell) | **87% of all PnL** concentrated in Silver Bullet AM + PM. NY PM "net" has negative expectancy. London adds 2% of PnL with 22% of trades. | `docs/pilots/004_session_breakdown.md` |
+| 005 | Session-mode comparison (A vs B vs C) | **Mode B (Silver Bullet only) wins every risk metric**: MaxDD halved, p95 DD ~1/3, worst trade -40%, max consec losers 3 vs 6. Promoted to production. | `docs/pilots/005_session_mode_comparison.md` |
 
-```bash
-python scripts/pilot_sensitivity_sweep.py --family MNQ --tf 5m --from 2024-01-01
-python scripts/pilot_sensitivity_sweep.py --grid extended    # 64 cells, slower
-python scripts/pilot_sensitivity_sweep.py --tf 1m            # very high-frequency probe
-```
+Scripts: `scripts/pilot_sensitivity_sweep.py`, `scripts/pilot_fixed_tp.py`,
+`scripts/pilot_003_wf_candidates.py`, `scripts/pilot_004_session_breakdown.py`,
+`scripts/pilot_005_mode_comparison.py`.
 
-The right reading is to look for **plateaus** (clusters of adjacent cells with
-similar high expectancy) — not the single peak, which is usually overfit.
-
-### Pilot menu — ICT-consistent ideas to raise frequency
-
-Documented as a checklist; each one is testable with a small script. None
-modify the strategy doctrine — they only open knobs that are already valid
-within ICT.
+### Pilot menu — open ideas (not yet executed)
 
 | # | Change                                                | Hypothesis            | Risk    |
 | - | ----------------------------------------------------- | --------------------- | ------- |
-| 1 | Lower timeframe (1m / 3m) instead of 5m               | 3-5× frequency        | medium  |
-| 2 | Activate Rejection / Mitigation / BPR / Inducement / VolImb setups (detectors already exist) | +50-80% | low |
-| 3 | Allow concurrent positions (`max_quantity` 2-3, lift single-position lock) | +20% | high (correlated loss) |
-| 4 | Multi-timeframe simultaneously (1m + 5m + 15m, dedup) | +30-100%              | medium  |
-| 5 | Multi-instrument (NQ + ES + YM)                       | up to 3×              | high    |
-| 6 | Weak-swing mode (`>=` instead of `>`)                 | +20-40%               | medium  |
-| 7 | Fixed-R TP instead of "nearest opposite pool"         | +30%                  | medium  |
-| 8 | Out-of-killzone entries when HTF confluence stacks    | +10-15%               | medium  |
+| 005b | Same 3 session modes on 1m / 3m timeframes          | Frequency uplift × ?  | medium  |
+| 006 | Activate Rejection / Mitigation / BPR / Inducement / VolImb setups | +50-80% signals | low |
+| 007 | Allow concurrent positions (lift single-position lock) | +20% trades          | high    |
+| 008 | Multi-instrument (NQ + ES + YM)                       | up to 3×             | high    |
+| 009 | Train ML filter on accumulated live shadow log + L2   | win-rate boost       | medium  |
 
-The current `compute_metrics` + `walk_forward` + `bootstrap_stats` already
-form the validation harness for each pilot. Acceptance rule: only promote a
-change to production config if it raises **OOS expectancy_R or aggregate test
-PnL** in `walk_forward_cme.py` over the multi-year CME series.
+Acceptance rule: only promote a change to production if it raises **OOS
+expectancy_R or aggregate test PnL** in `walk_forward_cme.py` over the
+multi-year CME series AND survives a session-mode comparison like pilot 005.
 
 ## L2 microstructure integration (where it lives, how to activate it)
 

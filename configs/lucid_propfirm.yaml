@@ -29,11 +29,11 @@ risk:
   max_quantity: 2                     # never more than 2 micros at once
   min_quantity: 1
   daily_loss_limit_pct: 1.0           # $250 → matches account.daily_loss_limit_usd
-  # Pilot 005 backtest 2024-2026 showed max consecutive losses = 3 with
-  # Silver-Bullet-only mode (vs 6 with all killzones). Setting the cap at 4
-  # gives 1 trade of margin so the bot is not paused exactly at the worst-
-  # case streak observed; tightening to 3 is OK but expect manual unlocks.
-  max_consecutive_losses: 4
+  # Operating only in SB AM + SB PM means the consecutive-losses streak
+  # is the LEAST likely killswitch to trip (worst observed = 3 in 2 yrs).
+  # User-chosen cap = 10: effectively a noisy-day stop. The daily-loss
+  # cap ($250) and per-trade risk ($60) remain the hard protectors.
+  max_consecutive_losses: 10
   max_trades_per_day: 5               # cap frequency in bad sessions
 
 setups:

@@ -40,7 +40,11 @@ from ict_bot.data.models import Bars
 from ict_bot.execution.kill_switch import KillSwitch
 from ict_bot.execution.quantower import QuantowerBroker
 from ict_bot.execution.runner import LiveConfig, LiveRunner
-from ict_bot.notifications import TelegramCommander, TelegramNotifier
+from ict_bot.notifications import (
+    ShadowSignalLogger,
+    TelegramCommander,
+    TelegramNotifier,
+)
 from ict_bot.risk.limits import LimitsConfig
 from ict_bot.risk.sizing import InstrumentSpec, RiskConfig
 from ict_bot.sessions.killzones import SessionsConfig
@@ -182,11 +186,20 @@ def main(argv: list[str] | None = None) -> int:
         SessionsConfig(allowed_windows=tuple(allowed)) if allowed else SessionsConfig()
     )
 
+    # Shadow logger: ALWAYS detects + records signals in ALL windows
+    # (mode A / B / C tags written per row) so we can audit and re-evaluate
+    # alternative session modes from live data later. Uses a SessionsConfig
+    # WITHOUT allowed_windows for tagging — the actual trade gate is
+    # `sessions_cfg` above.
+    shadow_dir = Path(REPO_ROOT) / "logs" / "shadow"
+    shadow = ShadowSignalLogger(out_dir=shadow_dir, sessions_config=SessionsConfig())
+
     runner = LiveRunner(
         broker=broker, config=live_cfg,
         instrument=instrument, risk=risk, limits=limits,
         sessions_config=sessions_cfg,
         kill_switch=kill,
+        shadow_logger=shadow,
     )
 
     # Telegram: notifier (fire-and-forget) + commander (long-poll listener).
@@ -294,6 +307,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         commander.stop()
         broker.disconnect()
+        shadow.close()
         notifier.enviar("sistema_parada", "loop stopped, disconnect ok")
         log.info("live_loop_stopped")
     return 0

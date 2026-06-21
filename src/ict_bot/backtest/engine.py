@@ -204,6 +204,14 @@ def run_backtest(  # noqa: PLR0912
                 if pe.submit_index >= t:
                     still.append(pe)
                     continue
+                # Re-check the session gate at FILL time — a signal detected
+                # one bar before news_block/lunch/end-of-killzone would
+                # otherwise leak past the gate. Pilot 004 caught 2 such
+                # trades over 2 years.
+                if cfg.enforce_killzones and \
+                        not new_entries_allowed(ts_ny_list[t], scfg):
+                    _skip("fill_gate_blocked")
+                    continue
                 s = pe.signal
                 fill_price = opens[t]
                 # Skip if fill price is already past SL (gapped beyond)

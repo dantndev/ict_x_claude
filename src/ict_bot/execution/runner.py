@@ -16,12 +16,13 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 
 from ict_bot.backtest.runner import detect_all_signals
 from ict_bot.data.models import Bars
 from ict_bot.execution.broker import Broker
 from ict_bot.execution.kill_switch import KillSwitch, KillSwitchTripped
+from ict_bot.notifications.shadow_logger import ShadowSignalLogger
 from ict_bot.risk.limits import LimitsConfig, LimitsState
 from ict_bot.risk.sizing import InstrumentSpec, RiskConfig, size_position
 from ict_bot.sessions.killzones import (
@@ -58,6 +59,7 @@ class LiveRunner:
     limits: LimitsConfig = field(default_factory=LimitsConfig)
     sessions_config: SessionsConfig = field(default_factory=SessionsConfig)
     kill_switch: KillSwitch = field(default_factory=KillSwitch)
+    shadow_logger: ShadowSignalLogger | None = None  # records ALL signals (B+C+A)
     state: LimitsState = field(default_factory=LimitsState)
     seen_bar_signal_indices: set[int] = field(default_factory=set)
     last_mid_open: float | None = None
@@ -65,7 +67,7 @@ class LiveRunner:
     paused: bool = False           # remote /pause toggle
     stop_requested: bool = False   # remote /stop toggle
 
-    def on_bars_window(self, bars_window: Bars) -> None:  # noqa: PLR0912
+    def on_bars_window(self, bars_window: Bars) -> None:
         """Re-run detectors over the trailing window and act on the latest signals."""
         if bars_window.empty:
             return
@@ -79,56 +81,97 @@ class LiveRunner:
             self.state.reset_for_day(today, self.broker.equity_usd())
             self._compute_midnight_open(bars_window, today)
 
-        # Force-flatten window
+        # Force-flatten window (does NOT block detection — we still want to
+        # log shadow signals around 16:30).
         if self.config.enforce_force_flat and force_flat(last_ts, self.sessions_config):
             log.info("force_flat_triggered")
             self.broker.flatten_all()
             return
 
-        # Gates that block new orders
-        if self.paused:
-            return
-        if self.config.enforce_killzones and \
-                not new_entries_allowed(last_ts, self.sessions_config):
-            return
-        if not self.state.can_trade(config=self.limits):
-            return
-        try:
-            self.kill_switch.assert_armed()
-        except KillSwitchTripped:
-            log.warning("kill_switch_blocking_orders", reason=self.kill_switch.reason)
-            return
-
-        # Detect signals; only act on those whose bar_index is the last bar (just closed)
+        # Detect ALL candidate signals first (independent of any filter) so
+        # the shadow logger sees them — this lets us evaluate alternative
+        # session modes after the fact (mode A / C analysis while running B).
         signals = detect_all_signals(bars_window)
         latest_idx = len(bars_window) - 1
-        for s in signals:
-            if s.bar_index != latest_idx:
+        bar_signals = [s for s in signals if s.bar_index == latest_idx
+                       and s.bar_index not in self.seen_bar_signal_indices]
+
+        # Decide why an entry would be blocked (single source of truth).
+        gate_reason = self._gate_reason(last_ts)
+
+        for s in bar_signals:
+            mid_reason = self._midnight_reason(s)
+            reason = gate_reason or mid_reason or ""
+            if reason:
+                self._record_shadow(s, executed=False, reason=reason)
                 continue
-            if s.bar_index in self.seen_bar_signal_indices:
-                continue
-            if self.config.enforce_midnight_filter:
-                if s.side == TradeSide.BUY and not midnight_open_filter_long(
-                    s.entry_price, self.last_mid_open,
-                ):
-                    continue
-                if s.side == TradeSide.SELL and not midnight_open_filter_short(
-                    s.entry_price, self.last_mid_open,
-                ):
-                    continue
             qty = size_position(
                 self.broker.equity_usd(), s.entry_price, s.stop_loss,
                 instrument=self.instrument, risk=self.risk,
             )
             if qty == 0:
+                self._record_shadow(s, executed=False, reason="sizing_zero")
                 continue
             ack = self.broker.submit_market(
                 self.config.symbol, side=str(s.side), quantity=qty,
                 sl=s.stop_loss, tp=s.take_profit,
             )
             self.seen_bar_signal_indices.add(s.bar_index)
+            self._record_shadow(
+                s, executed=ack.accepted,
+                reason="" if ack.accepted else (ack.reason or "broker_rejected"),
+                notes=f"qty={qty} ticket={ack.broker_order_id}",
+            )
             log.info("order_submitted", setup=s.setup_name, side=str(s.side),
-                     qty=qty, accepted=ack.accepted, broker_order_id=ack.broker_order_id)
+                     qty=qty, accepted=ack.accepted,
+                     broker_order_id=ack.broker_order_id)
+
+    def _gate_reason(self, last_ts: datetime) -> str:
+        """Return the first reason that blocks new entries, or '' if open."""
+        if self.paused:
+            return "paused"
+        if self.config.enforce_killzones and \
+                not new_entries_allowed(last_ts, self.sessions_config):
+            return "outside_allowed_window"
+        if not self.state.can_trade(config=self.limits):
+            return "limits_lock"
+        try:
+            self.kill_switch.assert_armed()
+        except KillSwitchTripped:
+            return f"kill_switch:{self.kill_switch.reason}"
+        return ""
+
+    def _midnight_reason(self, signal: object) -> str:
+        if not self.config.enforce_midnight_filter:
+            return ""
+        from ict_bot.signals.setups.base import Signal as _Signal
+        if not isinstance(signal, _Signal):
+            return ""
+        if signal.side == TradeSide.BUY and not midnight_open_filter_long(
+            signal.entry_price, self.last_mid_open,
+        ):
+            return "mid_open_filter_long"
+        if signal.side == TradeSide.SELL and not midnight_open_filter_short(
+            signal.entry_price, self.last_mid_open,
+        ):
+            return "mid_open_filter_short"
+        return ""
+
+    def _record_shadow(
+        self, signal: object, *,
+        executed: bool, reason: str = "", notes: str = "",
+    ) -> None:
+        if self.shadow_logger is None:
+            return
+        from ict_bot.signals.setups.base import Signal as _Signal
+        if not isinstance(signal, _Signal):
+            return
+        try:
+            self.shadow_logger.record(
+                signal, executed=executed, skip_reason=reason, notes=notes,
+            )
+        except Exception as e:
+            log.warning("shadow_logger_error", error=f"{type(e).__name__}: {e}")
 
     def _compute_midnight_open(self, bars_window: Bars, today: date) -> None:
         # Find first bar of `today` at 00:00 NY
