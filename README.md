@@ -83,6 +83,39 @@ IS-biased, treat as direction not magnitude):
 - Realistic live projection with 2 micros: **~$38/day net**, reaching the
   $1,250 evaluation target in **~6-7 weeks**
 
+## Multi-instrument — why we stay single (MNQ only)
+
+The repo supports loading any CME futures CSV via `load_cme_csv(family=...)`,
+and the broker layer is symbol-agnostic, so adding a second instrument is
+mechanically trivial. The question is whether it helps.
+
+We tested it (pilot 007, `docs/pilots/007_es_compare.md`): the same
+production cell on **ES with MES economy** (tick=$1.25, point=$5) over
+2025-01 → 2026-03:
+
+| | MNQ (prod) | ES (MES econ) |
+| - | --- | --- |
+| Win rate | 60.5% | 52.6% |
+| Expectancy R | +1.12 | +0.68 |
+| Expectancy $/trade | $246 | $124 |
+| Calendar overlap with MNQ | — | **79.6%** |
+
+**ES is discarded** because:
+
+1. Edge is materially weaker (WR -8 pp, exp R -39%). A small live→backtest
+   degradation could push it negative while MNQ would still be profitable.
+2. 79.6% of days the bot trades, it trades on BOTH instruments. That's
+   leverage, not diversification — a bad ES day is overwhelmingly a bad
+   NQ day too.
+3. Both hit max consecutive losers = 7 in the sample. Running both would
+   trip the account-level killswitch (`max_consecutive_losses: 6`) ~2× as
+   often, exactly when the account is already losing money.
+
+To revisit dual-instrument trading in the future, target a **non-NQ-correlated
+instrument** (CL crude, GC gold) where calendar overlap on the same Silver
+Bullet windows is < 50%. The plumbing is ready — just add the CSV, a
+`configs/<symbol>.yaml`, and re-run pilot 007 with that family.
+
 ## Shadow signal logger (analyze mode A/C while running mode B)
 
 `logs/shadow/<YYYY-MM-DD>.csv` is written for **every** signal the bot
@@ -340,6 +373,7 @@ Each pilot is independent and re-runnable. Full reports in `docs/pilots/`.
 | 004 | Per-killzone PnL breakdown (winner cell) | **87% of all PnL** concentrated in Silver Bullet AM + PM. NY PM "net" has negative expectancy. London adds 2% of PnL with 22% of trades. | `docs/pilots/004_session_breakdown.md` |
 | 005 | Session-mode comparison (A vs B vs C) | **Mode B (Silver Bullet only) wins every risk metric**: MaxDD halved, p95 DD ~1/3, worst trade -40%, max consec losers 3 vs 6. Promoted to production. | `docs/pilots/005_session_mode_comparison.md` |
 | 006 | TF sweep on mode B (1m/3m/5m/15m) | **1m wins on tr/day × exp_R = 2.149** (4.4× the 5m baseline). Slight OOS R degradation (+0.55 vs +0.88) is the trade-off. Caught a latent live↔backtest mismatch (live always ran 1m; backtest defaulted to 5m). Promoted 1m to production. | `docs/pilots/006_tf_sweep.md` |
+| 007 | ES (with MES economy) vs MNQ baseline | **ES discarded.** Edge is materially weaker (WR 52.6% vs 60.5%, exp R +0.68 vs +1.12) and calendar overlap with MNQ is 79.6% — not diversification, just leverage. Dual-instrument operation would double variance without raising expected return. | `docs/pilots/007_es_compare.md` |
 
 Scripts: `scripts/pilot_sensitivity_sweep.py`, `scripts/pilot_fixed_tp.py`,
 `scripts/pilot_003_wf_candidates.py`, `scripts/pilot_004_session_breakdown.py`,

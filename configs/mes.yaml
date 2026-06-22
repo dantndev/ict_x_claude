@@ -1,0 +1,31 @@
+# MES (Micro E-mini S&P 500) — instrument specs.
+# CME futures, electronic; quarterly contracts (H/M/U/Z).
+# Same price action as ES (full E-mini, $50/pt) but 10x smaller per contract.
+
+symbol:
+  family: MES
+  contract: MESU26
+  exchange: CME
+  description: "Micro E-mini S&P 500 Futures, continuous front-month"
+
+instrument:
+  tick_size: 0.25            # points
+  tick_value_usd: 1.25       # $1.25 per tick (= $5 per point) on Micro
+  point_value_usd: 5.00
+  currency: USD
+  trading_hours_ny:
+    open: "18:00"
+    close: "17:00"
+    daily_break: ["17:00", "18:00"]
+
+commissions:
+  per_side_usd: 0.40
+  slippage_ticks: 1
+
+risk_overrides:
+  per_trade_risk_pct: 0.5
+  max_trades_per_day: 8
+
+structure_overrides:
+  displacement:
+    body_atr_min: 1.0       # matches MNQ-tuned threshold
