@@ -25,7 +25,6 @@ import json
 import sys
 import time
 from datetime import date, datetime
-from pathlib import Path
 
 from ict_bot.backtest.engine import BacktestConfig, run_backtest
 from ict_bot.backtest.runner import PipelineConfig, detect_all_signals
@@ -72,7 +71,8 @@ def _pcfg() -> PipelineConfig:
 
 
 def _max_consec_losses(trades: list) -> int:
-    streak = 0; worst = 0
+    streak = 0
+    worst = 0
     for t in sorted(trades, key=lambda x: x.entry_ts_ny):
         if t.pnl_usd < 0:
             streak += 1
@@ -147,7 +147,8 @@ def main() -> int:
     common = nq["_trade_days"] & es["_trade_days"]
     union = nq["_trade_days"] | es["_trade_days"]
     overlap_pct = round(100 * len(common) / max(1, len(union)), 1)
-    nq.pop("_trade_days"); es.pop("_trade_days")
+    nq.pop("_trade_days")
+    es.pop("_trade_days")
 
     run_id = datetime.now().strftime("%Y%m%dT%H%M%S")
     out_dir = REPO_ROOT / "reports" / "pilots" / f"pilot_007_{run_id}"
@@ -177,7 +178,8 @@ def main() -> int:
     print(f"{'metric':<22} {'MNQ (prod)':>15} {'ES (MES econ)':>17}")
     print("-" * 56)
     for key, label in keys:
-        nv = nq[key]; ev = es[key]
+        nv = nq[key]
+        ev = es[key]
         if "pct" in key or key in ("win_rate", "boot_prob_profit"):
             print(f"{label:<22} {nv:>14.2%}  {ev:>16.2%}")
         elif isinstance(nv, float):
