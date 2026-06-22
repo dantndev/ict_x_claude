@@ -112,11 +112,11 @@ def main() -> int:
     print(f"Win rate: {m.win_rate:.1%}")
     print(f"Expectancy: ${m.expectancy_usd:,.2f} / {m.expectancy_r:+.2f} R")
     print(f"Total PnL: ${m.total_pnl_usd:,.2f}")
-    print(f"\nSL distance per contract:")
+    print("\nSL distance per contract:")
     print(f"  mean: {fmean(sl_distances_pts):.2f} pts  ${fmean(sl_distances_usd):.2f}")
     print(f"  max:  {max(sl_distances_pts):.2f} pts  ${max(sl_distances_usd):.2f}")
     print(f"  min:  {min(sl_distances_pts):.2f} pts  ${min(sl_distances_usd):.2f}")
-    print(f"\nFor a $25k account with $1k DD:")
+    print("\nFor a $25k account with $1k DD:")
     print(f"  - $1k DD / mean SL = {1000 / fmean(sl_distances_usd):.1f} max consecutive "
           f"full-stops at 1 micro")
     print(f"  - 0.24% of $25k = $60 risk budget. With mean SL of "
