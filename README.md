@@ -393,11 +393,11 @@ Scripts: `scripts/pilot_sensitivity_sweep.py`, `scripts/pilot_fixed_tp.py`,
 
 | # | Change                                                | Hypothesis            | Risk    |
 | - | ----------------------------------------------------- | --------------------- | ------- |
-| 005b | Same 3 session modes on 1m / 3m timeframes          | Frequency uplift × ?  | medium  |
-| 006 | Activate Rejection / Mitigation / BPR / Inducement / VolImb setups | +50-80% signals | low |
-| 007 | Allow concurrent positions (lift single-position lock) | +20% trades          | high    |
-| 008 | Multi-instrument (NQ + ES + YM)                       | up to 3×             | high    |
-| 009 | Train ML filter on accumulated live shadow log + L2   | win-rate boost       | medium  |
+| 009 | **Per-instrument sensitivity sweep** for ES / MGC (find their own plateau, not NQ's) | unlocks dual-instrument | medium |
+| 010 | Activate Rejection / Mitigation / BPR / Inducement / VolImb setups | +50-80% signals | low |
+| 011 | Allow concurrent positions (lift single-position lock) | +20% trades          | high    |
+| 012 | Train ML filter on accumulated live shadow log + L2   | win-rate boost       | medium  |
+| 013 | MGC live shadow (pilot 008b) — collect real ticks of gold while NQ trades | confirms edge before $$ | low |
 
 Acceptance rule: only promote a change to production if it raises **OOS
 expectancy_R or aggregate test PnL** in `walk_forward_cme.py` over the
