@@ -111,10 +111,19 @@ production cell on **ES with MES economy** (tick=$1.25, point=$5) over
    trip the account-level killswitch (`max_consecutive_losses: 6`) ~2× as
    often, exactly when the account is already losing money.
 
-To revisit dual-instrument trading in the future, target a **non-NQ-correlated
-instrument** (CL crude, GC gold) where calendar overlap on the same Silver
-Bullet windows is < 50%. The plumbing is ready — just add the CSV, a
-`configs/<symbol>.yaml`, and re-run pilot 007 with that family.
+**MGC (Micro Gold)** was tested in pilot 008 and is the first instrument
+showing real diversification (PnL correlation with NQ = 0.043). Marked as
+"not yet" — its edge is marginal (WR 51.8%) and the extra +$13/day from
+adding it doesn't justify doubling the operational complexity before NQ
+has 20+ live trades of validation. After that, a shadow pilot collects
+real MGC ticks in parallel without trading them, and only then a live
+activation is considered.
+
+To revisit other dual-instrument candidates in the future, target a
+**non-NQ-correlated instrument** (CL crude, RTY/M2K small-caps) where
+calendar overlap on the same Silver Bullet windows is < 50%. The
+plumbing is ready — just add the CSV, a `configs/<symbol>.yaml`, and
+re-run pilot 008 with that family.
 
 ## Shadow signal logger (analyze mode A/C while running mode B)
 
@@ -374,6 +383,7 @@ Each pilot is independent and re-runnable. Full reports in `docs/pilots/`.
 | 005 | Session-mode comparison (A vs B vs C) | **Mode B (Silver Bullet only) wins every risk metric**: MaxDD halved, p95 DD ~1/3, worst trade -40%, max consec losers 3 vs 6. Promoted to production. | `docs/pilots/005_session_mode_comparison.md` |
 | 006 | TF sweep on mode B (1m/3m/5m/15m) | **1m wins on tr/day × exp_R = 2.149** (4.4× the 5m baseline). Slight OOS R degradation (+0.55 vs +0.88) is the trade-off. Caught a latent live↔backtest mismatch (live always ran 1m; backtest defaulted to 5m). Promoted 1m to production. | `docs/pilots/006_tf_sweep.md` |
 | 007 | ES (with MES economy) vs MNQ baseline | **ES discarded.** Edge is materially weaker (WR 52.6% vs 60.5%, exp R +0.68 vs +1.12) and calendar overlap with MNQ is 79.6% — not diversification, just leverage. Dual-instrument operation would double variance without raising expected return. | `docs/pilots/007_es_compare.md` |
+| 008 | MGC (Micro Gold) vs MNQ baseline + dual-instrument analysis | **Gold has edge AND is uncorrelated** (PnL correlation with NQ on overlapping days = 0.043 — first real diversification candidate). But edge is marginal: WR 51.8% (vs 60.5% NQ), exp R +0.62 (vs +1.12). Adding MGC live now is premature; **decision: not yet**, re-evaluate after NQ accumulates 20+ live trades and pilot 008b shadow-collects MGC live. | `docs/pilots/008_mgc_compare.md` |
 
 Scripts: `scripts/pilot_sensitivity_sweep.py`, `scripts/pilot_fixed_tp.py`,
 `scripts/pilot_003_wf_candidates.py`, `scripts/pilot_004_session_breakdown.py`,

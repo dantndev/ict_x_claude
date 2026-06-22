@@ -1,0 +1,31 @@
+# MGC (Micro Gold Futures) — instrument specs.
+# CME futures, electronic. 10 troy ounces per contract.
+# Six contract months per year: G=Feb, J=Apr, M=Jun, Q=Aug, V=Oct, Z=Dec.
+
+symbol:
+  family: MGC
+  contract: MGCQ26
+  exchange: COMEX
+  description: "Micro Gold Futures, 10 oz, continuous front-month"
+
+instrument:
+  tick_size: 0.10            # $/oz
+  tick_value_usd: 1.00       # $1 per tick on Micro Gold
+  point_value_usd: 10.00     # $10 per $1 move
+  currency: USD
+  trading_hours_ny:
+    open: "18:00"
+    close: "17:00"
+    daily_break: ["17:00", "18:00"]
+
+commissions:
+  per_side_usd: 0.40
+  slippage_ticks: 1
+
+risk_overrides:
+  per_trade_risk_pct: 0.5
+  max_trades_per_day: 8
+
+structure_overrides:
+  displacement:
+    body_atr_min: 1.0
