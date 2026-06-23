@@ -29,7 +29,7 @@ Response:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 import httpx
@@ -100,7 +100,7 @@ class LucidExecutor:
                 except Exception:
                     pass
                 log.info("lucid_health_ok", symbol=self.symbol,
-                         caps=self.capabilities.__dict__)
+                         caps=asdict(self.capabilities))
                 return True
         except Exception as e:
             log.warning("lucid_health_failed", error=str(e),

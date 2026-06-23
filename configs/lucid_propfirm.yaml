@@ -15,7 +15,7 @@ account:
   max_drawdown_pct: 4.0
   daily_loss_limit_usd: 250.0        # cuts a bad day at 25% of total DD budget
   data_symbol: ENQU26                # E-mini NQ Sep 2026 (M=Jun expired 2026-06)
-  exec_symbol: MNQU26                # Micro NQ Sep 2026
+  exec_symbol: MNQU6                 # Micro NQ Sep 2026 (short form — matches bridge)
 
 connection:
   dom2_url: http://localhost:8080/dom2

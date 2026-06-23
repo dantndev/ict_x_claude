@@ -1,0 +1,1 @@
+python scripts/supervisor.py --confirm LIVE
