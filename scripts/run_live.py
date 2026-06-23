@@ -34,8 +34,14 @@ from pathlib import Path
 
 import polars as pl
 import yaml
+from dotenv import load_dotenv
 
 from ict_bot.config.settings import REPO_ROOT
+
+# Load .env into os.environ BEFORE importing anything that reads env vars
+# (TelegramNotifier/TelegramCommander read TELEGRAM_TOKEN/TELEGRAM_CHAT_ID
+# via os.environ.get at construction time).
+load_dotenv(REPO_ROOT / ".env")
 from ict_bot.data.models import Bars
 from ict_bot.execution.kill_switch import KillSwitch
 from ict_bot.execution.quantower import QuantowerBroker
