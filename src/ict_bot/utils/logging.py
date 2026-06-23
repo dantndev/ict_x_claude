@@ -23,6 +23,10 @@ def configure_logging(level: str = "INFO", *, json_output: bool = False) -> None
         stream=sys.stdout,
         level=log_level,
     )
+    # Silence noisy third-party loggers — httpx logs every GET/POST at INFO,
+    # which floods the console when polling DOM2 at poll_hz=2 (≈120 lines/min).
+    for noisy in ("httpx", "httpcore", "urllib3"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
